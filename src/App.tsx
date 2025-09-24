@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
 import { InventoryProvider } from './contexts/InventoryContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { LoginForm } from './components/LoginForm';
 import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { LoginForm } from './components/LoginForm';
 import { Dashboard } from './components/Dashboard';
 import { POSSystem } from './components/POSSystem';
 import { ProductManagement } from './components/ProductManagement';
@@ -23,59 +25,170 @@ import { Settings } from './components/Settings';
 import { Toaster } from 'sonner';
 
 function AppContent() {
-  const { user } = useAuth();
-  const [currentPage, setCurrentPage] = useState('dashboard');
-
-  if (!user) {
-    return <LoginForm />;
-  }
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard':
-        return <Dashboard onPageChange={setCurrentPage} />;
-      case 'products':
-        return <ProductManagement />;
-      case 'suppliers':
-        return <SupplierManagement />;
-      case 'pos':
-        return <POSSystem />;
-      case 'warehouses':
-        return <WarehouseManagement />;
-      case 'shops':
-        return <ShopManagement />;
-      case 'users':
-        return <UserManagement />;
-      case 'reports':
-        return <Reports />;
-      case 'expenses':
-        return <ExpenseManagement />;
-      case 'taxes':
-        return <TaxCalculations />;
-      case 'incidents':
-        return <IncidentReports />;
-      case 'events':
-        return <EventsNoticeBoard />;
-      case 'chat':
-        return <ChatSystem />;
-      case 'logs':
-        return <ActivityLogs />;
-      case 'settings':
-        return <Settings />;
-      default:
-        return <Dashboard onPageChange={setCurrentPage} />;
-    }
-  };
-
   return (
-    <Layout currentPage={currentPage} onPageChange={setCurrentPage}>
-      {renderPage()}
+    <Routes>
+      {/* Login route without layout */}
+      <Route path="/login" element={<LoginForm />} />
+      
+      {/* Protected routes with layout */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute permission="dashboard.view">
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/products"
+        element={
+          <ProtectedRoute permission="products.view">
+            <Layout>
+              <ProductManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/suppliers"
+        element={
+          <ProtectedRoute permission="suppliers.view">
+            <Layout>
+              <SupplierManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pos"
+        element={
+          <ProtectedRoute permission="pos.view">
+            <Layout>
+              <POSSystem />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/warehouses"
+        element={
+          <ProtectedRoute permission="warehouses.view">
+            <Layout>
+              <WarehouseManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/shops"
+        element={
+          <ProtectedRoute permission="shops.view">
+            <Layout>
+              <ShopManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute permission="users.view">
+            <Layout>
+              <UserManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reports"
+        element={
+          <ProtectedRoute permission="reports.view">
+            <Layout>
+              <Reports />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expenses"
+        element={
+          <ProtectedRoute permission="expenses.view">
+            <Layout>
+              <ExpenseManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/taxes"
+        element={
+          <ProtectedRoute permission="taxes.view">
+            <Layout>
+              <TaxCalculations />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/incidents"
+        element={
+          <ProtectedRoute permission="incidents.view">
+            <Layout>
+              <IncidentReports />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/events"
+        element={
+          <ProtectedRoute permission="events.view">
+            <Layout>
+              <EventsNoticeBoard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/chat"
+        element={
+          <ProtectedRoute permission="chat.view">
+            <Layout>
+              <ChatSystem />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/logs"
+        element={
+          <ProtectedRoute permission="logs.view">
+            <Layout>
+              <ActivityLogs />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute permission="settings.view">
+            <Layout>
+              <Settings />
     </Layout>
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }
 
 export default function App() {
   return (
+    <BrowserRouter>
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
@@ -88,5 +201,6 @@ export default function App() {
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>
+    </BrowserRouter>
   );
 }

@@ -10,7 +10,7 @@ export interface User {
   lastLogin?: Date;
 }
 
-export type UserRole = 'super_admin' | 'admin' | 'warehouse_manager' | 'shop_manager' | 'custom';
+export type UserRole = 'super_admin' | 'tenant_admin' | 'admin' | 'warehouse_manager' | 'shop_manager' | 'custom';
 
 export interface CustomRole {
   id: string;

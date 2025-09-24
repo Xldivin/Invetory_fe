@@ -183,7 +183,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-type UserRole = 'super_admin' | 'admin' | 'warehouse_manager' | 'shop_manager' | 'custom';
+type UserRole = 'super_admin' | 'tenant_admin' | 'admin' | 'warehouse_manager' | 'shop_manager' | 'custom';
 
 type User = {
   id: string;
@@ -347,6 +347,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const rolePermissions: Record<UserRole, string[]> = {
       super_admin: [
         'dashboard.view', 'users.view', 'users.create', 'users.edit', 'users.delete',
+        'logs.view', 'settings.view'
+      ],
+      tenant_admin: [
+        'dashboard.view', 'products.view', 'products.create', 'products.edit', 'products.delete',
+        'suppliers.view', 'suppliers.create', 'suppliers.edit', 'suppliers.delete',
+        'pos.view', 'warehouses.view', 'warehouses.create', 'warehouses.edit', 'warehouses.delete',
+        'shops.view', 'shops.create', 'shops.edit', 'shops.delete',
+        'users.view', 'users.create', 'users.edit', 'users.delete',
+        'reports.view', 'expenses.view', 'expenses.create', 'expenses.edit', 'expenses.delete',
+        'taxes.view', 'taxes.create', 'taxes.edit', 'taxes.delete',
+        'events.view', 'events.create', 'events.edit', 'events.delete',
         'logs.view', 'settings.view'
       ],
       admin: [

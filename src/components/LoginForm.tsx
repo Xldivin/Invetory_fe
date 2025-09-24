@@ -173,6 +173,7 @@
 
 
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -183,9 +184,14 @@ import { useAuth } from '../contexts/AuthContext';
 
 export function LoginForm() {
   const { login, loginWithPin } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'email' | 'pin'>('email');
   const [error, setError] = useState('');
+
+  // Get the intended destination from location state, default to dashboard
+  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   const [credentials, setCredentials] = useState({
     email: '',
@@ -201,7 +207,9 @@ export function LoginForm() {
 
     try {
       const success = await login(credentials.email, credentials.password);
-      if (!success) {
+      if (success) {
+        navigate(from, { replace: true });
+      } else {
         setError('Invalid email or password');
       }
     } catch {
@@ -218,7 +226,9 @@ export function LoginForm() {
 
     try {
       const success = await loginWithPin(pin);
-      if (!success) {
+      if (success) {
+        navigate(from, { replace: true });
+      } else {
         setError('Invalid PIN');
       }
     } catch {

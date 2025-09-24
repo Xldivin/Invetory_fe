@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -28,10 +29,6 @@ import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
-interface DashboardProps {
-  onPageChange: (page: string) => void;
-}
-
 // Mock chart data
 const recentSalesData = [
   { month: 'Jan', amount: 12400, orders: 45 },
@@ -49,25 +46,75 @@ const groundnutSalesData = [
   { variety: 'Mixed', sales: 520, percentage: 15 }
 ];
 
-export function Dashboard({ onPageChange }: DashboardProps) {
+export function Dashboard() {
   const { products, stock, invoices, warehouses, shops, syncStatus } = useInventory();
   const { user, hasPermission } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
-  // Calculate metrics
-  const totalProducts = products.length;
-  const totalStock = stock.reduce((sum, item) => sum + item.quantity, 0);
-  const lowStockItems = stock.filter(stockItem => {
+  const [apiStats, setApiStats] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoadingStats(true);
+        setStatsError(null);
+        
+        const token = localStorage.getItem('sessionToken') || '';
+        const envTenantId = (import.meta as any)?.env?.VITE_TENANT_ID;
+        const storedTenantId = localStorage.getItem('tenantId') || localStorage.getItem('tenant_id');
+        const tenantId = envTenantId || storedTenantId || '';
+
+        const response = await fetch('http://localhost:8000/api/products/stats', {
+          headers: {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch stats: ${response.status}`);
+        }
+
+        const json = await response.json();
+        if (json && json.success && json.data) {
+          setApiStats(json.data);
+        }
+      } catch (e: any) {
+        setStatsError(e?.message || 'Failed to load dashboard stats');
+        console.error('Failed to load dashboard stats:', e);
+      } finally {
+        setLoadingStats(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  // Calculate metrics (use API data when available, fallback to local data)
+  const totalProducts = apiStats?.total_products ?? products.length;
+  const totalStock = apiStats?.total_inventory_value ?? stock.reduce((sum, item) => sum + item.quantity, 0);
+  const lowStockItems = apiStats?.low_stock_products ?? stock.filter(stockItem => {
     const product = products.find(p => p.id === stockItem.productId);
     return product && stockItem.quantity <= product.minStock;
   }).length;
 
-  const totalRevenue = invoices
+  const totalRevenue = apiStats?.total_retail_value ?? invoices
     .filter(invoice => invoice.status === 'paid')
     .reduce((sum, invoice) => sum + invoice.total, 0);
 
   const totalOrders = invoices.length;
-  const pendingOrders = invoices.filter(invoice => invoice.status === 'pending').length;
+  const pendingOrders = invoices.filter(invoice => invoice.status === 'draft').length;
+  
+  // Additional API stats
+  const activeProducts = apiStats?.active_products ?? 0;
+  const featuredProducts = apiStats?.featured_products ?? 0;
+  const outOfStockProducts = apiStats?.out_of_stock_products ?? 0;
+  const needsReorderProducts = apiStats?.needs_reorder_products ?? 0;
+  const totalInventoryValue = apiStats?.total_inventory_value ?? 0;
 
   const recentActivities = [
     { id: 1, action: 'New order received from Kano Traders', time: '2 hours ago', type: 'order' },
@@ -105,20 +152,29 @@ export function Dashboard({ onPageChange }: DashboardProps) {
               {syncStatus.pendingChanges} pending
             </Badge>
           )}
+          {statsError && (
+            <Badge variant="destructive">
+              Stats unavailable
+            </Badge>
+          )}
         </div>
       </div>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onPageChange('products')}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/products')}>
           <CardContent className="p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('dashboard.totalItems')}</p>
-                <p className="text-2xl lg:text-3xl">{totalStock.toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">Total Products</p>
+                <p className="text-2xl lg:text-3xl">
+                  {loadingStats ? "..." : totalProducts.toLocaleString()}
+                </p>
                 <div className="flex items-center gap-1 mt-1">
                   <TrendingUp className="w-3 h-3 text-green-500" />
-                  <span className="text-xs text-green-500">+12.5% vs last month</span>
+                  <span className="text-xs text-green-500">
+                    {apiStats ? `${activeProducts} active` : "+12.5% vs last month"}
+                  </span>
                 </div>
               </div>
               <Package className="h-8 w-8 text-muted-foreground" />
@@ -126,15 +182,19 @@ export function Dashboard({ onPageChange }: DashboardProps) {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onPageChange('warehouses')}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/warehouses')}>
           <CardContent className="p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('dashboard.lowStock')}</p>
-                <p className="text-2xl lg:text-3xl">{lowStockItems}</p>
+                <p className="text-sm text-muted-foreground">Low Stock Items</p>
+                <p className="text-2xl lg:text-3xl">
+                  {loadingStats ? "..." : lowStockItems.toLocaleString()}
+                </p>
                 <div className="flex items-center gap-1 mt-1">
                   <AlertTriangle className="w-3 h-3 text-orange-500" />
-                  <span className="text-xs text-orange-500">Needs attention</span>
+                  <span className="text-xs text-orange-500">
+                    {apiStats ? `${outOfStockProducts} out of stock` : "Needs attention"}
+                  </span>
                 </div>
               </div>
               <AlertTriangle className="h-8 w-8 text-muted-foreground" />
@@ -142,15 +202,19 @@ export function Dashboard({ onPageChange }: DashboardProps) {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onPageChange('pos')}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/pos')}>
           <CardContent className="p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('dashboard.orders')}</p>
-                <p className="text-2xl lg:text-3xl">{totalOrders}</p>
+                <p className="text-sm text-muted-foreground">Orders</p>
+                <p className="text-2xl lg:text-3xl">
+                  {loadingStats ? "..." : totalOrders.toLocaleString()}
+                </p>
                 <div className="flex items-center gap-1 mt-1">
                   <TrendingUp className="w-3 h-3 text-blue-500" />
-                  <span className="text-xs text-blue-500">{pendingOrders} pending</span>
+                  <span className="text-xs text-blue-500">
+                    {apiStats ? `${needsReorderProducts} need reorder` : `${pendingOrders} draft`}
+                  </span>
                 </div>
               </div>
               <ShoppingCart className="h-8 w-8 text-muted-foreground" />
@@ -158,15 +222,19 @@ export function Dashboard({ onPageChange }: DashboardProps) {
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => onPageChange('reports')}>
+        <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate('/reports')}>
           <CardContent className="p-4 lg:p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">{t('dashboard.revenue')}</p>
-                <p className="text-2xl lg:text-3xl">{totalRevenue.toLocaleString()} RWF</p>
+                <p className="text-sm text-muted-foreground">Total Value</p>
+                <p className="text-2xl lg:text-3xl">
+                  {loadingStats ? "..." : `${totalRevenue.toLocaleString()} RWF`}
+                </p>
                 <div className="flex items-center gap-1 mt-1">
                   <TrendingUp className="w-3 h-3 text-green-500" />
-                  <span className="text-xs text-green-500">+8.2% vs last month</span>
+                  <span className="text-xs text-green-500">
+                    {apiStats ? `${featuredProducts} featured` : "+8.2% vs last month"}
+                  </span>
                 </div>
               </div>
               <DollarSign className="h-8 w-8 text-muted-foreground" />
@@ -235,20 +303,36 @@ export function Dashboard({ onPageChange }: DashboardProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Top Groundnut Varieties</CardTitle>
-            <CardDescription>Sales by variety this month</CardDescription>
+            <CardTitle>Top Categories</CardTitle>
+            <CardDescription>Products by category</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={groundnutSalesData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="variety" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [`${value.toLocaleString()} RWF`, 'Sales']} />
-                  <Bar dataKey="sales" fill="#8884d8" />
-                </BarChart>
-              </ResponsiveContainer>
+              {loadingStats ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-muted-foreground">Loading categories...</p>
+                </div>
+              ) : apiStats?.top_categories?.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={apiStats.top_categories}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`${value} products`, 'Count']} />
+                    <Bar dataKey="product_count" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={groundnutSalesData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="variety" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`${value.toLocaleString()} RWF`, 'Sales']} />
+                    <Bar dataKey="sales" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -310,7 +394,7 @@ export function Dashboard({ onPageChange }: DashboardProps) {
               <Button 
                 variant="outline" 
                 className="h-auto p-4 flex flex-col gap-2"
-                onClick={() => onPageChange('pos')}
+                onClick={() => navigate('/pos')}
               >
                 <ShoppingCart className="w-6 h-6" />
                 <span className="text-sm">New Sale</span>
@@ -318,7 +402,7 @@ export function Dashboard({ onPageChange }: DashboardProps) {
               <Button 
                 variant="outline" 
                 className="h-auto p-4 flex flex-col gap-2"
-                onClick={() => onPageChange('products')}
+                onClick={() => navigate('/products')}
               >
                 <Package className="w-6 h-6" />
                 <span className="text-sm">Add Product</span>
@@ -326,7 +410,7 @@ export function Dashboard({ onPageChange }: DashboardProps) {
               <Button 
                 variant="outline" 
                 className="h-auto p-4 flex flex-col gap-2"
-                onClick={() => onPageChange('warehouses')}
+                onClick={() => navigate('/warehouses')}
               >
                 <Warehouse className="w-6 h-6" />
                 <span className="text-sm">Check Stock</span>
@@ -334,7 +418,7 @@ export function Dashboard({ onPageChange }: DashboardProps) {
               <Button 
                 variant="outline" 
                 className="h-auto p-4 flex flex-col gap-2"
-                onClick={() => onPageChange('reports')}
+                onClick={() => navigate('/reports')}
               >
                 <TrendingUp className="w-6 h-6" />
                 <span className="text-sm">View Reports</span>

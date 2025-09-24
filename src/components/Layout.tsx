@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Package, 
@@ -38,103 +39,118 @@ import { useTheme } from '../contexts/ThemeContext';
 
 interface LayoutProps {
   children: React.ReactNode;
-  currentPage: string;
-  onPageChange: (page: string) => void;
 }
 
-export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
+export function Layout({ children }: LayoutProps) {
   const { user, logout, hasPermission } = useAuth();
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const menuItems = [
     { 
       id: 'dashboard', 
+      path: '/dashboard',
       label: t('nav.dashboard'), 
       icon: LayoutDashboard, 
       permission: 'dashboard.view' 
     },
     { 
       id: 'products', 
+      path: '/products',
       label: t('nav.products'), 
       icon: Package, 
       permission: 'products.view' 
     },
     { 
       id: 'suppliers', 
+      path: '/suppliers',
       label: t('nav.suppliers'), 
       icon: Truck, 
       permission: 'suppliers.view' 
     },
     { 
       id: 'pos', 
+      path: '/pos',
       label: t('nav.pos'), 
       icon: ShoppingCart, 
       permission: 'pos.view' 
     },
     { 
       id: 'warehouses', 
+      path: '/warehouses',
       label: t('nav.warehouses'), 
       icon: Warehouse, 
       permission: 'warehouses.view' 
     },
     { 
       id: 'shops', 
+      path: '/shops',
       label: t('nav.shops'), 
       icon: Store, 
       permission: 'shops.view' 
     },
     { 
       id: 'users', 
+      path: '/users',
       label: t('nav.users'), 
       icon: Users, 
       permission: 'users.view' 
     },
     { 
       id: 'reports', 
+      path: '/reports',
       label: t('nav.reports'), 
       icon: FileText, 
       permission: 'reports.view' 
     },
     { 
       id: 'expenses', 
+      path: '/expenses',
       label: t('nav.expenses'), 
       icon: Receipt, 
       permission: 'expenses.view' 
     },
     { 
       id: 'taxes', 
+      path: '/taxes',
       label: t('nav.taxes'), 
       icon: Calculator, 
       permission: 'taxes.view' 
     },
     { 
       id: 'incidents', 
+      path: '/incidents',
       label: t('nav.incidents'), 
       icon: AlertTriangle, 
       permission: 'incidents.view' 
     },
     { 
       id: 'events', 
+      path: '/events',
       label: t('nav.events'), 
       icon: Calendar, 
       permission: 'events.view' 
     },
     { 
       id: 'chat', 
+      path: '/chat',
       label: t('nav.chat'), 
       icon: MessageSquare, 
       permission: 'chat.view' 
     },
     { 
       id: 'logs', 
+      path: '/logs',
       label: t('nav.logs'), 
       icon: Activity, 
       permission: 'logs.view' 
     },
     { 
       id: 'settings', 
+      path: '/settings',
       label: t('nav.settings'), 
       icon: Settings, 
       permission: 'settings.view' 
@@ -195,12 +211,12 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
               <button
                 key={item.id}
                 onClick={() => {
-                  onPageChange(item.id);
+                  navigate(item.path);
                   setSidebarOpen(false);
                 }}
                 className={`
                   w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors
-                  ${currentPage === item.id 
+                  ${location.pathname === item.path 
                     ? 'bg-primary text-primary-foreground' 
                     : 'hover:bg-accent hover:text-accent-foreground'
                   }
@@ -230,7 +246,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={() => onPageChange('settings')}>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <Settings className="mr-2 h-4 w-4" />
                 {t('nav.settings')}
               </DropdownMenuItem>
@@ -259,7 +275,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
             </Button>
             <div className="hidden sm:block">
               <h2 className="text-lg capitalize">
-                {filteredMenuItems.find(item => item.id === currentPage)?.label || 'Dashboard'}
+                {filteredMenuItems.find(item => item.path === location.pathname)?.label || 'Dashboard'}
               </h2>
             </div>
           </div>
@@ -324,7 +340,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
                     </p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onPageChange('settings')}>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
                     <Settings className="mr-2 h-4 w-4" />
                     {t('nav.settings')}
                   </DropdownMenuItem>
