@@ -29,10 +29,22 @@ export interface Permission {
 export interface Warehouse {
   id: string;
   name: string;
-  location: string;
+  code?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  phone_number?: string;
+  email?: string;
   managerId: string;
   capacity: number;
+  warehouse_type?: 'main' | 'secondary' | 'cold_storage' | 'transit' | string;
+  operating_hours?: string;
+  temperature_controlled?: boolean;
+  security_level?: 'low' | 'medium' | 'high' | string;
   description?: string;
+  location?: string;
   createdAt: Date;
 }
 

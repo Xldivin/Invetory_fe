@@ -10,6 +10,7 @@ import {
   StockRequest,
   SyncStatus
 } from '../types';
+import { fetchWarehouses, createWarehouse as apiCreateWarehouse } from '../services/warehouses';
 
 interface InventoryContextType {
   // Products
@@ -209,26 +210,18 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     }
   ]);
 
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([
-    {
-      id: '1',
-      name: 'Main Processing Center',
-      location: 'Industrial District, Kano',
-      managerId: '3',
-      capacity: 5000,
-      description: 'Primary groundnut processing and storage facility',
-      createdAt: new Date('2024-01-01')
-    },
-    {
-      id: '2',
-      name: 'Export Hub Warehouse',
-      location: 'Port Area, Lagos',
-      managerId: '3',
-      capacity: 3000,
-      description: 'Specialized warehouse for export quality groundnuts',
-      createdAt: new Date('2024-01-10')
-    }
-  ]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const remote = await fetchWarehouses();
+        setWarehouses(remote);
+      } catch (error) {
+        // Keep empty list if API fails; could log if needed
+      }
+    })();
+  }, []);
 
   const [shops, setShops] = useState<Shop[]>([
     {
@@ -380,13 +373,26 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     setProducts(prev => prev.filter(product => product.id !== id));
   };
 
-  const addWarehouse = (warehouseData: Omit<Warehouse, 'id' | 'createdAt'>) => {
-    const newWarehouse: Warehouse = {
-      ...warehouseData,
-      id: Date.now().toString(),
-      createdAt: new Date()
+  const addWarehouse = async (warehouseData: Omit<Warehouse, 'id' | 'createdAt'>) => {
+    const payload = {
+      name: warehouseData.name,
+      code: warehouseData.code,
+      address: warehouseData.address,
+      city: warehouseData.city,
+      state: warehouseData.state,
+      postal_code: warehouseData.postal_code,
+      country: warehouseData.country,
+      phone_number: warehouseData.phone_number,
+      email: warehouseData.email,
+      manager_id: warehouseData.managerId ? Number(warehouseData.managerId) || undefined : undefined,
+      capacity: warehouseData.capacity,
+      warehouse_type: warehouseData.warehouse_type,
+      operating_hours: warehouseData.operating_hours,
+      temperature_controlled: warehouseData.temperature_controlled,
+      security_level: warehouseData.security_level,
     };
-    setWarehouses(prev => [...prev, newWarehouse]);
+    const created = await apiCreateWarehouse(payload);
+    setWarehouses(prev => [...prev, created]);
   };
 
   const updateWarehouse = (id: string, updates: Partial<Warehouse>) => {

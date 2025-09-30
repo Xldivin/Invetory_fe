@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -194,7 +195,7 @@ export function ShopManagement() {
               <div className="space-y-4">
                 <div>
                   <Label>Shop</Label>
-                  <Select value={requestForm.shopId} onValueChange={(value) => setRequestForm(prev => ({ ...prev, shopId: value }))}>
+                  <Select value={requestForm.shopId} onValueChange={(value: any) => setRequestForm(prev => ({ ...prev, shopId: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select shop" />
                     </SelectTrigger>
@@ -209,7 +210,7 @@ export function ShopManagement() {
                 </div>
                 <div>
                   <Label>Warehouse</Label>
-                  <Select value={requestForm.warehouseId} onValueChange={(value) => setRequestForm(prev => ({ ...prev, warehouseId: value }))}>
+                  <Select value={requestForm.warehouseId} onValueChange={(value: any) => setRequestForm(prev => ({ ...prev, warehouseId: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select warehouse" />
                     </SelectTrigger>
@@ -224,7 +225,7 @@ export function ShopManagement() {
                 </div>
                 <div>
                   <Label>Product</Label>
-                  <Select value={requestForm.productId} onValueChange={(value) => setRequestForm(prev => ({ ...prev, productId: value }))}>
+                  <Select value={requestForm.productId} onValueChange={(value: any) => setRequestForm(prev => ({ ...prev, productId: value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select product" />
                     </SelectTrigger>
@@ -292,7 +293,7 @@ export function ShopManagement() {
                   </div>
                   <div>
                     <Label>Connected Warehouses</Label>
-                    <Select onValueChange={(value) => {
+                    <Select onValueChange={(value: string) => {
                       if (!shopForm.warehouseIds.includes(value)) {
                         setShopForm(prev => ({ 
                           ...prev, 

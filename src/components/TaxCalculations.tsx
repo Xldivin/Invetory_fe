@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -242,7 +243,7 @@ export function TaxCalculations() {
             <div className="space-y-4">
               <div>
                 <Label>Tax Period</Label>
-                <Select value={entryForm.period} onValueChange={(value) => setEntryForm(prev => ({ ...prev, period: value }))}>
+                <Select value={entryForm.period} onValueChange={(value: any) => setEntryForm(prev => ({ ...prev, period: value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select period" />
                   </SelectTrigger>
@@ -281,7 +282,7 @@ export function TaxCalculations() {
               </div>
               <div>
                 <Label>Tax Rate (%)</Label>
-                <Select value={entryForm.taxRate} onValueChange={(value) => setEntryForm(prev => ({ ...prev, taxRate: value }))}>
+                <Select value={entryForm.taxRate} onValueChange={(value: any) => setEntryForm(prev => ({ ...prev, taxRate: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -436,7 +437,7 @@ export function TaxCalculations() {
                         {editingEntry?.id === entry.id ? (
                           <Select 
                             defaultValue={entry.taxRate.toString()}
-                            onValueChange={(value) => {
+                            onValueChange={(value: string) => {
                               const taxRate = parseFloat(value);
                               handleSaveEntry(entry.id, { taxRate });
                             }}

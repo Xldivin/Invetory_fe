@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -23,7 +24,7 @@ import {
   Smartphone
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 export function Settings() {
   const { user, logActivity } = useAuth();
@@ -223,7 +224,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="timezone">Timezone</Label>
-                  <Select value={settings.timezone} onValueChange={(value) => handleSettingChange('timezone', value)}>
+                  <Select value={settings.timezone} onValueChange={(value: any) => handleSettingChange('timezone', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -238,7 +239,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="currency">Currency</Label>
-                  <Select value={settings.currency} onValueChange={(value) => handleSettingChange('currency', value)}>
+                  <Select value={settings.currency} onValueChange={(value: any) => handleSettingChange('currency', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -252,7 +253,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="language">Language</Label>
-                  <Select value={settings.language} onValueChange={(value) => handleSettingChange('language', value)}>
+                  <Select value={settings.language} onValueChange={(value: any) => handleSettingChange('language', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -318,7 +319,7 @@ export function Settings() {
                   <Switch
                     id="emailNotifications"
                     checked={settings.emailNotifications}
-                    onCheckedChange={(checked) => handleSettingChange('emailNotifications', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('emailNotifications', checked)}
                   />
                 </div>
                 <Separator />
@@ -330,7 +331,7 @@ export function Settings() {
                   <Switch
                     id="smsNotifications"
                     checked={settings.smsNotifications}
-                    onCheckedChange={(checked) => handleSettingChange('smsNotifications', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('smsNotifications', checked)}
                   />
                 </div>
                 <Separator />
@@ -342,7 +343,7 @@ export function Settings() {
                   <Switch
                     id="pushNotifications"
                     checked={settings.pushNotifications}
-                    onCheckedChange={(checked) => handleSettingChange('pushNotifications', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('pushNotifications', checked)}
                   />
                 </div>
                 <Separator />
@@ -354,7 +355,7 @@ export function Settings() {
                   <Switch
                     id="lowStockAlerts"
                     checked={settings.lowStockAlerts}
-                    onCheckedChange={(checked) => handleSettingChange('lowStockAlerts', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('lowStockAlerts', checked)}
                   />
                 </div>
                 <Separator />
@@ -366,7 +367,7 @@ export function Settings() {
                   <Switch
                     id="orderNotifications"
                     checked={settings.orderNotifications}
-                    onCheckedChange={(checked) => handleSettingChange('orderNotifications', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('orderNotifications', checked)}
                   />
                 </div>
                 <Separator />
@@ -378,7 +379,7 @@ export function Settings() {
                   <Switch
                     id="systemMaintenanceAlerts"
                     checked={settings.systemMaintenanceAlerts}
-                    onCheckedChange={(checked) => handleSettingChange('systemMaintenanceAlerts', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('systemMaintenanceAlerts', checked)}
                   />
                 </div>
               </div>
@@ -405,7 +406,7 @@ export function Settings() {
                   <Switch
                     id="twoFactorAuth"
                     checked={settings.twoFactorAuth}
-                    onCheckedChange={(checked) => handleSettingChange('twoFactorAuth', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('twoFactorAuth', checked)}
                   />
                 </div>
                 <Separator />
@@ -431,7 +432,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="passwordRequirements">Password Requirements</Label>
-                  <Select value={settings.passwordRequirements} onValueChange={(value) => handleSettingChange('passwordRequirements', value)}>
+                  <Select value={settings.passwordRequirements} onValueChange={(value: any) => handleSettingChange('passwordRequirements', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -466,13 +467,13 @@ export function Settings() {
                   <Switch
                     id="autoBackup"
                     checked={settings.autoBackup}
-                    onCheckedChange={(checked) => handleSettingChange('autoBackup', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('autoBackup', checked)}
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="backupFrequency">Backup Frequency</Label>
-                    <Select value={settings.backupFrequency} onValueChange={(value) => handleSettingChange('backupFrequency', value)}>
+                    <Select value={settings.backupFrequency} onValueChange={(value: any) => handleSettingChange('backupFrequency', value)}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -503,7 +504,7 @@ export function Settings() {
                   <Switch
                     id="maintenanceMode"
                     checked={settings.maintenanceMode}
-                    onCheckedChange={(checked) => handleSettingChange('maintenanceMode', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('maintenanceMode', checked)}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -514,7 +515,7 @@ export function Settings() {
                   <Switch
                     id="debugMode"
                     checked={settings.debugMode}
-                    onCheckedChange={(checked) => handleSettingChange('debugMode', checked)}
+                    onCheckedChange={(checked: any) => handleSettingChange('debugMode', checked)}
                   />
                 </div>
               </div>
@@ -535,7 +536,7 @@ export function Settings() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="theme">Theme</Label>
-                  <Select value={settings.theme} onValueChange={(value) => handleSettingChange('theme', value)}>
+                  <Select value={settings.theme} onValueChange={(value: any) => handleSettingChange('theme', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -548,7 +549,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="itemsPerPage">Items Per Page</Label>
-                  <Select value={settings.itemsPerPage.toString()} onValueChange={(value) => handleSettingChange('itemsPerPage', parseInt(value))}>
+                  <Select value={settings.itemsPerPage.toString()} onValueChange={(value: string) => handleSettingChange('itemsPerPage', parseInt(value))}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -562,7 +563,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="dateFormat">Date Format</Label>
-                  <Select value={settings.dateFormat} onValueChange={(value) => handleSettingChange('dateFormat', value)}>
+                  <Select value={settings.dateFormat} onValueChange={(value: any) => handleSettingChange('dateFormat', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -575,7 +576,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="timeFormat">Time Format</Label>
-                  <Select value={settings.timeFormat} onValueChange={(value) => handleSettingChange('timeFormat', value)}>
+                  <Select value={settings.timeFormat} onValueChange={(value: any) => handleSettingChange('timeFormat', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -619,7 +620,7 @@ export function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="inventoryMethod">Inventory Method</Label>
-                  <Select value={settings.inventoryMethod} onValueChange={(value) => handleSettingChange('inventoryMethod', value)}>
+                  <Select value={settings.inventoryMethod} onValueChange={(value: any) => handleSettingChange('inventoryMethod', value)}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -640,7 +641,7 @@ export function Settings() {
                 <Switch
                   id="autoRequestEnabled"
                   checked={settings.autoRequestEnabled}
-                  onCheckedChange={(checked) => handleSettingChange('autoRequestEnabled', checked)}
+                  onCheckedChange={(checked: any) => handleSettingChange('autoRequestEnabled', checked)}
                 />
               </div>
             </CardContent>

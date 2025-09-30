@@ -1,4 +1,5 @@
-import React from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,6 +20,14 @@ export function ProtectedRoute({ children, permission }: ProtectedRouteProps) {
   // If permission is required and user doesn't have it, redirect to dashboard
   if (permission && !hasPermission(permission)) {
     return <Navigate to="/dashboard" replace state={{ from: location }} />;
+  }
+
+  // Role-based restrictions: Hide POS and Events for tenant_admin
+  if (user.role === 'tenant_admin') {
+    const restrictedRoutes = ['/pos', '/events'];
+    if (restrictedRoutes.includes(location.pathname)) {
+      return <Navigate to="/dashboard" replace state={{ from: location }} />;
+    }
   }
 
   return <>{children}</>;

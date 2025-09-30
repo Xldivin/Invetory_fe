@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -28,6 +29,8 @@ import {
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { getApiUrl, getCommonHeaders, getAuthToken, getTenantId, API_CONFIG } from '../config/api';
+import { TenantManagement as TenantManagementAdmin } from './TenantManagementAdmin';
 
 // Mock chart data
 const recentSalesData = [
@@ -62,17 +65,11 @@ export function Dashboard() {
         setLoadingStats(true);
         setStatsError(null);
         
-        const token = localStorage.getItem('sessionToken') || '';
-        const envTenantId = (import.meta as any)?.env?.VITE_TENANT_ID;
-        const storedTenantId = localStorage.getItem('tenantId') || localStorage.getItem('tenant_id');
-        const tenantId = envTenantId || storedTenantId || '';
+        const token = getAuthToken();
+        const tenantId = getTenantId();
 
-        const response = await fetch('http://localhost:8000/api/products/stats', {
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
-            'Accept': 'application/json'
-          }
+        const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.PRODUCTS_STATS), {
+          headers: getCommonHeaders(token, tenantId)
         });
 
         if (!response.ok) {
@@ -426,6 +423,12 @@ export function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {user?.role === 'super_admin' && (
+        <div className="space-y-4">
+          <TenantManagementAdmin />
+        </div>
       )}
     </div>
   );

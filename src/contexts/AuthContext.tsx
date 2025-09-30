@@ -182,6 +182,8 @@
 
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getApiUrl, getCommonHeaders, API_CONFIG } from '../config/api';
+import { logApiConfig, logApiRequest, logApiResponse } from '../utils/apiDebug';
 
 type UserRole = 'super_admin' | 'tenant_admin' | 'admin' | 'warehouse_manager' | 'shop_manager' | 'custom';
 
@@ -218,18 +220,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE = 'http://localhost:8000/api';
-const TENANT_ID = undefined;
 const TENANT_CODE = undefined;
-
-function commonHeaders(token?: string) {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
-  };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (TENANT_ID) headers['X-Tenant-ID'] = String(TENANT_ID);
-  return headers;
-}
 
 function shapeUserFromBackend(data: any): User {
   const u = data?.user || data; // supports me/profile endpoints too
@@ -263,18 +254,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      // Debug logging
+      logApiConfig();
+      
+      const url = getApiUrl(API_CONFIG.ENDPOINTS.LOGIN);
+      const headers = getCommonHeaders();
+      const body = JSON.stringify({
+        email,
+        password,
+        ...(TENANT_CODE ? { tenant_code: TENANT_CODE } : {})
+      });
+      
+      logApiRequest(url, { method: 'POST', headers, body });
+      
+      const res = await fetch(url, {
         method: 'POST',
-        headers: commonHeaders(),
-        body: JSON.stringify({
-          email,
-          password,
-          ...(TENANT_CODE ? { tenant_code: TENANT_CODE } : {})
-        })
+        headers,
+        body
       });
 
       const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.success) return false;
+      logApiResponse(res, json);
+      
+      if (!res.ok || !json?.success) {
+        console.error('❌ Login failed:', res.status, res.statusText, json);
+        return false;
+      }
 
       const shaped = shapeUserFromBackend(json.data);
       const token = json.data?.session?.token as string | undefined;
@@ -293,9 +298,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithPin = async (pin: string): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_BASE}/auth/login-pin`, {
+      const res = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.LOGIN_PIN), {
         method: 'POST',
-        headers: commonHeaders(),
+        headers: getCommonHeaders(),
         body: JSON.stringify({
           pin,
           ...(TENANT_CODE ? { tenant_code: TENANT_CODE } : {})
@@ -323,9 +328,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const token = localStorage.getItem('sessionToken') || undefined;
     try {
       if (token) {
-        await fetch(`${API_BASE}/auth/logout`, {
+        await fetch(getApiUrl(API_CONFIG.ENDPOINTS.LOGOUT), {
           method: 'POST',
-          headers: commonHeaders(token)
+          headers: getCommonHeaders(token)
         });
       }
     } catch { }

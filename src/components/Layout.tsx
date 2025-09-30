@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -22,7 +23,8 @@ import {
   ChevronDown,
   Truck,
   Sun,
-  Moon
+  Moon,
+  Building2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -57,6 +59,14 @@ export function Layout({ children }: LayoutProps) {
       icon: LayoutDashboard, 
       permission: 'dashboard.view' 
     },
+    // Super admin only: Tenants
+    user?.role === 'super_admin' ? {
+      id: 'tenants',
+      path: '/tenants',
+      label: 'Tenants',
+      icon: Building2,
+      permission: 'dashboard.view'
+    } : null,
     { 
       id: 'products', 
       path: '/products',
@@ -157,7 +167,18 @@ export function Layout({ children }: LayoutProps) {
     },
   ];
 
-  const filteredMenuItems = menuItems.filter(item => hasPermission(item.permission));
+  const filteredMenuItems = menuItems.filter((item): item is NonNullable<typeof item> => {
+    if (!item) return false;
+    // Check permission first
+    if (!hasPermission(item.permission)) return false;
+    
+    // Hide POS and Events for tenant_admin
+    if (user?.role === 'tenant_admin' && (item.id === 'pos' || item.id === 'events')) {
+      return false;
+    }
+    
+    return true;
+  });
 
   const languages = [
     { code: 'en', name: t('lang.english'), flag: '🇺🇸' },

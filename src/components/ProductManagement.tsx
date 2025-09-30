@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -21,6 +22,9 @@ import {
 } from 'lucide-react';
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
+import { toast } from 'sonner';
+import { getApiUrl, getCommonHeaders, getAuthToken, getTenantId, API_CONFIG } from '../config/api';
 import { Product, Category } from '../types';
 
 export function ProductManagement() {
@@ -129,17 +133,11 @@ export function ProductManagement() {
       try {
         setLoading(true);
         setError(null);
-        const token = localStorage.getItem('sessionToken') || '';
-        const envTenantId = (import.meta as any)?.env?.VITE_TENANT_ID;
-        const storedTenantId = localStorage.getItem('tenantId') || localStorage.getItem('tenant_id');
-        const tenantId = envTenantId || storedTenantId || '';
+        const token = getAuthToken();
+        const tenantId = getTenantId();
 
-        const response = await fetch('http://localhost:8000/api/products', {
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
-            'Accept': 'application/json'
-          }
+        const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.PRODUCTS), {
+          headers: getCommonHeaders(token, tenantId)
         });
         if (!response.ok) {
           throw new Error(`Request failed: ${response.status}`);
@@ -160,17 +158,11 @@ export function ProductManagement() {
     const fetchCategories = async () => {
       try {
         setLoadingCategories(true);
-        const token = localStorage.getItem('sessionToken') || '';
-        const envTenantId = (import.meta as any)?.env?.VITE_TENANT_ID;
-        const storedTenantId = localStorage.getItem('tenantId') || localStorage.getItem('tenant_id');
-        const tenantId = envTenantId || storedTenantId || '';
+        const token = getAuthToken();
+        const tenantId = getTenantId();
 
-        const response = await fetch('http://localhost:8000/api/categories/roots', {
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
-            'Accept': 'application/json'
-          }
+        const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.CATEGORIES_ROOTS), {
+          headers: getCommonHeaders(token, tenantId)
         });
         if (!response.ok) {
           throw new Error(`Failed to fetch categories: ${response.status}`);
@@ -229,14 +221,9 @@ export function ProductManagement() {
         payload.parent_category_id = Number(categoryForm.parent_category_id);
       }
 
-      const res = await fetch('http://localhost:8000/api/categories', {
+      const res = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.CATEGORIES), {
         method: 'POST',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: getCommonHeaders(token, tenantId),
         body: JSON.stringify(payload)
       });
 
@@ -248,7 +235,7 @@ export function ProductManagement() {
       setShowAddCategory(false);
       
       // Refresh categories list to show the newly created category
-      const categoryResponse = await fetch('http://localhost:8000/api/categories/roots', {
+      const categoryResponse = await fetch('https://seba.hanohost.net/api/categories/roots', {
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
           ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
@@ -317,14 +304,9 @@ export function ProductManagement() {
         gallery_images: productForm.gallery_images ? productForm.gallery_images.split(',').map((img) => img.trim()).filter(Boolean) : []
       };
 
-      const res = await fetch('http://localhost:8000/api/products', {
+      const res = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.PRODUCTS), {
         method: 'POST',
-        headers: {
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-          ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: getCommonHeaders(token, tenantId),
         body: JSON.stringify(payload)
       });
 
@@ -477,14 +459,9 @@ export function ProductManagement() {
           gallery_images: productForm.gallery_images ? productForm.gallery_images.split(',').map((img) => img.trim()).filter(Boolean) : (Array.isArray(editingProductApi.gallery_images) ? editingProductApi.gallery_images : [])
         };
 
-        const res = await fetch(`http://localhost:8000/api/products/${editingProductApi.product_id}`, {
+        const res = await fetch(getApiUrl(`${API_CONFIG.ENDPOINTS.PRODUCTS}/${editingProductApi.product_id}`), {
           method: 'PUT',
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
+          headers: getCommonHeaders(token, tenantId),
           body: JSON.stringify(payload)
         });
         const json = await res.json().catch(() => null);
@@ -533,17 +510,11 @@ export function ProductManagement() {
     if (product && 'product_id' in product) {
       if (!confirm(`Delete "${product.name}"?`)) return;
       try {
-        const token = localStorage.getItem('sessionToken') || '';
-        const envTenantId = (import.meta as any)?.env?.VITE_TENANT_ID;
-        const storedTenantId = localStorage.getItem('tenantId') || localStorage.getItem('tenant_id');
-        const tenantId = envTenantId || storedTenantId || '';
-        const res = await fetch(`http://localhost:8000/api/products/${product.product_id}`, {
+        const token = getAuthToken();
+        const tenantId = getTenantId();
+        const res = await fetch(getApiUrl(`${API_CONFIG.ENDPOINTS.PRODUCTS}/${product.product_id}`), {
           method: 'DELETE',
-          headers: {
-            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-            ...(tenantId ? { 'X-Tenant-ID': String(tenantId) } : {}),
-            'Accept': 'application/json'
-          }
+          headers: getCommonHeaders(token, tenantId)
         });
         if (!res.ok) {
           const msg = await res.text().catch(() => 'Delete failed');

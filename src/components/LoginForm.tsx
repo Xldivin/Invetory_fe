@@ -172,7 +172,8 @@
 // }
 
 
-import React, { useState } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';

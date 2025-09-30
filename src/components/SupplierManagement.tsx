@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { Plus, Edit, Eye, Trash2, Search, Filter, MapPin, Phone, Mail, Calendar, Users, Package } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -11,182 +12,261 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { API_CONFIG, getApiUrl, getCommonHeaders, getAuthToken, getTenantId } from '../config/api';
 
 interface Supplier {
-  id: string;
+  supplier_id: number;
+  tenant_id: number;
   name: string;
-  contactPerson: string;
+  contact_person: string;
   email: string;
-  phone: string;
+  phone_number: string;
   address: string;
   city: string;
   country: string;
-  supplierType: 'groundnut' | 'packaging' | 'equipment' | 'other';
-  status: 'active' | 'inactive' | 'suspended';
+  tax_number: string;
+  payment_terms: string;
+  credit_limit: number;
   rating: number;
-  totalOrders: number;
-  totalValue: number;
-  lastOrderDate?: Date;
-  notes: string;
-  createdAt: Date;
-  updatedAt: Date;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  products_count: number;
+  purchases_count: number;
 }
 
-const mockSuppliers: Supplier[] = [
-  {
-    id: '1',
-    name: 'Kigali Groundnut Farms',
-    contactPerson: 'Jean Claude Muhire',
-    email: 'contact@kigaligroundnuts.rw',
-    phone: '+250 788 123 456',
-    address: 'KN 15 St',
-    city: 'Kigali',
-    country: 'Rwanda',
-    supplierType: 'groundnut',
-    status: 'active',
-    rating: 4.5,
-    totalOrders: 125,
-    totalValue: 15750000,
-    lastOrderDate: new Date('2024-03-15'),
-    notes: 'Premium quality groundnuts, reliable delivery',
-    createdAt: new Date('2023-01-15'),
-    updatedAt: new Date('2024-03-15')
-  },
-  {
-    id: '2',
-    name: 'Musanze Agricultural Co-op',
-    contactPerson: 'Marie Uwimana',
-    email: 'info@musanzecoop.rw',
-    phone: '+250 788 987 654',
-    address: 'Musanze District',
-    city: 'Musanze',
-    country: 'Rwanda',
-    supplierType: 'groundnut',
-    status: 'active',
-    rating: 4.2,
-    totalOrders: 87,
-    totalValue: 9800000,
-    lastOrderDate: new Date('2024-03-10'),
-    notes: 'Good quality, competitive prices',
-    createdAt: new Date('2023-03-20'),
-    updatedAt: new Date('2024-03-10')
+// API Functions
+const fetchSuppliers = async (): Promise<{ data: Supplier[]; total: number; current_page: number; last_page: number }> => {
+  try {
+    const token = getAuthToken();
+    const tenantId = getTenantId();
+    const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.SUPPLIERS), {
+      method: 'GET',
+      headers: getCommonHeaders(token, tenantId),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('API Response:', result); // Debug log
+    
+    // Handle different response structures
+    if (result.data && Array.isArray(result.data.data)) {
+      return result.data;
+    } else if (Array.isArray(result.data)) {
+      return {
+        data: result.data,
+        total: result.total || result.data.length,
+        current_page: result.current_page || 1,
+        last_page: result.last_page || 1
+      };
+    } else {
+      console.warn('Unexpected API response structure:', result);
+      return {
+        data: [],
+        total: 0,
+        current_page: 1,
+        last_page: 1
+      };
+    }
+  } catch (error) {
+    console.error('Error fetching suppliers:', error);
+    throw error;
   }
-];
+};
+
+const createSupplier = async (supplierData: Partial<Supplier>): Promise<Supplier> => {
+  try {
+    const token = getAuthToken();
+    const tenantId = getTenantId();
+    const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.SUPPLIERS), {
+      method: 'POST',
+      headers: getCommonHeaders(token, tenantId),
+      body: JSON.stringify(supplierData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error) {
+    console.error('Error creating supplier:', error);
+    throw error;
+  }
+};
+
+const updateSupplier = async (supplierId: number, supplierData: Partial<Supplier>): Promise<Supplier> => {
+  try {
+    const token = getAuthToken();
+    const tenantId = getTenantId();
+    const response = await fetch(`${getApiUrl(API_CONFIG.ENDPOINTS.SUPPLIERS)}/${supplierId}`, {
+      method: 'PUT',
+      headers: getCommonHeaders(token, tenantId),
+      body: JSON.stringify(supplierData),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  } catch (error) {
+    console.error('Error updating supplier:', error);
+    throw error;
+  }
+};
+
+const deleteSupplier = async (supplierId: number): Promise<void> => {
+  try {
+    const token = getAuthToken();
+    const tenantId = getTenantId();
+    const response = await fetch(`${getApiUrl(API_CONFIG.ENDPOINTS.SUPPLIERS)}/${supplierId}`, {
+      method: 'DELETE',
+      headers: getCommonHeaders(token, tenantId),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error('Error deleting supplier:', error);
+    throw error;
+  }
+};
 
 export function SupplierManagement() {
   const { user, logActivity } = useAuth();
   const { t } = useLanguage();
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [filteredSuppliers, setFilteredSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Supplier>>({});
 
+  // Fetch suppliers on component mount
   useEffect(() => {
-    let filtered = suppliers;
+    const loadSuppliers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await fetchSuppliers();
+        const suppliersData = result.data || [];
+        setSuppliers(suppliersData);
+        setFilteredSuppliers(suppliersData);
+      } catch (err) {
+        setError('Failed to load suppliers');
+        console.error('Error loading suppliers:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSuppliers();
+  }, []);
+
+  useEffect(() => {
+    let filtered = suppliers || [];
 
     if (searchTerm) {
       filtered = filtered.filter(supplier =>
         supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        supplier.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        supplier.contact_person.toLowerCase().includes(searchTerm.toLowerCase()) ||
         supplier.email.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(supplier => supplier.status === statusFilter);
-    }
-
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter(supplier => supplier.supplierType === typeFilter);
+      filtered = filtered.filter(supplier => supplier.is_active === (statusFilter === 'active'));
     }
 
     setFilteredSuppliers(filtered);
-  }, [suppliers, searchTerm, statusFilter, typeFilter]);
+  }, [suppliers, searchTerm, statusFilter]);
 
-  const handleAddSupplier = () => {
-    if (!formData.name || !formData.contactPerson || !formData.email || !formData.phone) {
+  const handleAddSupplier = async () => {
+    if (!formData.name || !formData.contact_person || !formData.email || !formData.phone_number) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    const newSupplier: Supplier = {
-      id: Date.now().toString(),
-      name: formData.name || '',
-      contactPerson: formData.contactPerson || '',
-      email: formData.email || '',
-      phone: formData.phone || '',
-      address: formData.address || '',
-      city: formData.city || '',
-      country: formData.country || 'Rwanda',
-      supplierType: (formData.supplierType as any) || 'groundnut',
-      status: 'active',
-      rating: 0,
-      totalOrders: 0,
-      totalValue: 0,
-      notes: formData.notes || '',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    setSuppliers(prev => [...prev, newSupplier]);
-    setFormData({});
-    setIsAddDialogOpen(false);
-    logActivity('create', 'suppliers', { supplierId: newSupplier.id, supplierName: newSupplier.name });
-    toast.success('Supplier added successfully');
+    try {
+      const newSupplier = await createSupplier(formData);
+      setSuppliers(prev => [...prev, newSupplier]);
+      setFilteredSuppliers(prev => [...prev, newSupplier]);
+      setFormData({});
+      setIsAddDialogOpen(false);
+      logActivity('create', 'suppliers', { supplierId: newSupplier.supplier_id, supplierName: newSupplier.name });
+      toast.success('Supplier added successfully');
+    } catch (error) {
+      console.error('Error creating supplier:', error);
+      toast.error('Failed to create supplier');
+    }
   };
 
-  const handleEditSupplier = () => {
-    if (!selectedSupplier || !formData.name || !formData.contactPerson || !formData.email || !formData.phone) {
+  const handleEditSupplier = async () => {
+    if (!selectedSupplier || !formData.name || !formData.contact_person || !formData.email || !formData.phone_number) {
       toast.error('Please fill in all required fields');
       return;
     }
 
-    setSuppliers(prev => prev.map(supplier =>
-      supplier.id === selectedSupplier.id
-        ? { ...supplier, ...formData, updatedAt: new Date() }
-        : supplier
-    ));
+    try {
+      const updatedSupplier = await updateSupplier(selectedSupplier.supplier_id, formData);
+      setSuppliers(prev => prev.map(supplier =>
+        supplier.supplier_id === selectedSupplier.supplier_id
+          ? updatedSupplier
+          : supplier
+      ));
+      setFilteredSuppliers(prev => prev.map(supplier =>
+        supplier.supplier_id === selectedSupplier.supplier_id
+          ? updatedSupplier
+          : supplier
+      ));
 
-    setIsEditDialogOpen(false);
-    setSelectedSupplier(null);
-    setFormData({});
-    logActivity('update', 'suppliers', { supplierId: selectedSupplier.id });
-    toast.success('Supplier updated successfully');
+      setIsEditDialogOpen(false);
+      setSelectedSupplier(null);
+      setFormData({});
+      logActivity('update', 'suppliers', { supplierId: selectedSupplier.supplier_id });
+      toast.success('Supplier updated successfully');
+    } catch (error) {
+      console.error('Error updating supplier:', error);
+      toast.error('Failed to update supplier');
+    }
   };
 
-  const handleDeleteSupplier = (supplier: Supplier) => {
+  const handleDeleteSupplier = async (supplier: Supplier) => {
     if (window.confirm(`Are you sure you want to delete ${supplier.name}?`)) {
-      setSuppliers(prev => prev.filter(s => s.id !== supplier.id));
-      logActivity('delete', 'suppliers', { supplierId: supplier.id, supplierName: supplier.name });
-      toast.success('Supplier deleted successfully');
+      try {
+        await deleteSupplier(supplier.supplier_id);
+        setSuppliers(prev => prev.filter(s => s.supplier_id !== supplier.supplier_id));
+        setFilteredSuppliers(prev => prev.filter(s => s.supplier_id !== supplier.supplier_id));
+        logActivity('delete', 'suppliers', { supplierId: supplier.supplier_id, supplierName: supplier.name });
+        toast.success('Supplier deleted successfully');
+      } catch (error) {
+        console.error('Error deleting supplier:', error);
+        toast.error('Failed to delete supplier');
+      }
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      active: 'bg-green-100 text-green-800',
-      inactive: 'bg-gray-100 text-gray-800',
-      suspended: 'bg-red-100 text-red-800'
-    };
-    return <Badge className={variants[status as keyof typeof variants]}>{status}</Badge>;
+  const getStatusBadge = (isActive: boolean) => {
+    return (
+      <Badge className={isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+        {isActive ? 'Active' : 'Inactive'}
+      </Badge>
+    );
   };
 
-  const getTypeBadge = (type: string) => {
-    const variants = {
-      groundnut: 'bg-amber-100 text-amber-800',
-      packaging: 'bg-blue-100 text-blue-800',
-      equipment: 'bg-purple-100 text-purple-800',
-      other: 'bg-gray-100 text-gray-800'
-    };
-    return <Badge className={variants[type as keyof typeof variants]}>{type}</Badge>;
-  };
 
   const resetForm = () => {
     setFormData({});
@@ -224,7 +304,7 @@ export function SupplierManagement() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -233,7 +313,7 @@ export function SupplierManagement() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Suppliers</p>
-                <p className="text-2xl font-bold">{suppliers.length}</p>
+                <p className="text-2xl font-bold">{suppliers?.length || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -246,7 +326,7 @@ export function SupplierManagement() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Active Suppliers</p>
-                <p className="text-2xl font-bold">{suppliers.filter(s => s.status === 'active').length}</p>
+                <p className="text-2xl font-bold">{suppliers?.filter(s => s.is_active).length || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -258,28 +338,37 @@ export function SupplierManagement() {
                 <Package className="h-5 w-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Groundnut Suppliers</p>
-                <p className="text-2xl font-bold">{suppliers.filter(s => s.supplierType === 'groundnut').length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Calendar className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Value</p>
-                <p className="text-2xl font-bold">
-                  {(suppliers.reduce((sum, s) => sum + s.totalValue, 0) / 1000000).toFixed(1)}M RWF
-                </p>
+                <p className="text-sm text-muted-foreground">Total Products</p>
+                <p className="text-2xl font-bold">{suppliers?.reduce((sum, s) => sum + (Number(s.products_count) || 0), 0) || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Loading and Error States */}
+      {loading && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-muted-foreground">Loading suppliers...</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {error && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-destructive">{error}</p>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4"
+              variant="outline"
+            >
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -304,19 +393,6 @@ export function SupplierManagement() {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="active">Active</SelectItem>
                 <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="groundnut">Groundnut</SelectItem>
-                <SelectItem value="packaging">Packaging</SelectItem>
-                <SelectItem value="equipment">Equipment</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -324,9 +400,10 @@ export function SupplierManagement() {
       </Card>
 
       {/* Suppliers Table */}
-      <Card>
+      {!loading && !error && (
+        <Card>
         <CardHeader>
-          <CardTitle>Suppliers ({filteredSuppliers.length})</CardTitle>
+          <CardTitle>Suppliers ({filteredSuppliers?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -335,17 +412,14 @@ export function SupplierManagement() {
                 <TableRow>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Contact</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Orders</TableHead>
-                  <TableHead>Total Value</TableHead>
-                  <TableHead>Rating</TableHead>
+                  <TableHead>Products</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
+                {(filteredSuppliers || []).map((supplier) => (
+                  <TableRow key={supplier.supplier_id}>
                     <TableCell>
                       <div>
                         <p className="font-medium">{supplier.name}</p>
@@ -354,20 +428,12 @@ export function SupplierManagement() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{supplier.contactPerson}</p>
-                        <p className="text-sm text-muted-foreground">{supplier.phone}</p>
+                        <p className="font-medium">{supplier.contact_person}</p>
+                        <p className="text-sm text-muted-foreground">{supplier.phone_number}</p>
                       </div>
                     </TableCell>
-                    <TableCell>{getTypeBadge(supplier.supplierType)}</TableCell>
-                    <TableCell>{getStatusBadge(supplier.status)}</TableCell>
-                    <TableCell>{supplier.totalOrders}</TableCell>
-                    <TableCell>{(supplier.totalValue / 1000).toLocaleString()} RWF</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <span>⭐</span>
-                        <span>{supplier.rating.toFixed(1)}</span>
-                      </div>
-                    </TableCell>
+                    <TableCell>{getStatusBadge(supplier.is_active)}</TableCell>
+                    <TableCell>{supplier.products_count}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Button
@@ -400,7 +466,8 @@ export function SupplierManagement() {
             </Table>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      )}
 
       {/* Add Supplier Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -419,11 +486,11 @@ export function SupplierManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contactPerson">Contact Person *</Label>
+              <Label htmlFor="contact_person">Contact Person *</Label>
               <Input
-                id="contactPerson"
-                value={formData.contactPerson || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, contactPerson: e.target.value }))}
+                id="contact_person"
+                value={formData.contact_person || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
                 placeholder="Enter contact person"
               />
             </div>
@@ -438,11 +505,11 @@ export function SupplierManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone *</Label>
+              <Label htmlFor="phone_number">Phone *</Label>
               <Input
-                id="phone"
-                value={formData.phone || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                id="phone_number"
+                value={formData.phone_number || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
                 placeholder="Enter phone number"
               />
             </div>
@@ -474,30 +541,44 @@ export function SupplierManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="supplierType">Supplier Type</Label>
-              <Select
-                value={formData.supplierType || 'groundnut'}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, supplierType: value as any }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="groundnut">Groundnut</SelectItem>
-                  <SelectItem value="packaging">Packaging</SelectItem>
-                  <SelectItem value="equipment">Equipment</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="tax_number">Tax Number</Label>
+              <Input
+                id="tax_number"
+                value={formData.tax_number || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, tax_number: e.target.value }))}
+                placeholder="Enter tax number"
+              />
             </div>
-            <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Enter any additional notes"
-                rows={3}
+            <div className="space-y-2">
+              <Label htmlFor="payment_terms">Payment Terms</Label>
+              <Input
+                id="payment_terms"
+                value={formData.payment_terms || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
+                placeholder="e.g., Net 30"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="credit_limit">Credit Limit (RWF)</Label>
+              <Input
+                id="credit_limit"
+                type="number"
+                value={formData.credit_limit || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, credit_limit: parseFloat(e.target.value) || 0 }))}
+                placeholder="Enter credit limit"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="rating">Rating</Label>
+              <Input
+                id="rating"
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                value={formData.rating || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, rating: parseFloat(e.target.value) || 0 }))}
+                placeholder="Enter rating (0-5)"
               />
             </div>
           </div>
@@ -527,11 +608,11 @@ export function SupplierManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-contactPerson">Contact Person *</Label>
+              <Label htmlFor="edit-contact_person">Contact Person *</Label>
               <Input
-                id="edit-contactPerson"
-                value={formData.contactPerson || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, contactPerson: e.target.value }))}
+                id="edit-contact_person"
+                value={formData.contact_person || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
                 placeholder="Enter contact person"
               />
             </div>
@@ -546,11 +627,11 @@ export function SupplierManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone *</Label>
+              <Label htmlFor="edit-phone_number">Phone *</Label>
               <Input
-                id="edit-phone"
-                value={formData.phone || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                id="edit-phone_number"
+                value={formData.phone_number || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone_number: e.target.value }))}
                 placeholder="Enter phone number"
               />
             </div>
@@ -582,27 +663,51 @@ export function SupplierManagement() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-supplierType">Supplier Type</Label>
-              <Select
-                value={formData.supplierType || ''}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, supplierType: value as any }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="groundnut">Groundnut</SelectItem>
-                  <SelectItem value="packaging">Packaging</SelectItem>
-                  <SelectItem value="equipment">Equipment</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="edit-tax_number">Tax Number</Label>
+              <Input
+                id="edit-tax_number"
+                value={formData.tax_number || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, tax_number: e.target.value }))}
+                placeholder="Enter tax number"
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-status">Status</Label>
+              <Label htmlFor="edit-payment_terms">Payment Terms</Label>
+              <Input
+                id="edit-payment_terms"
+                value={formData.payment_terms || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, payment_terms: e.target.value }))}
+                placeholder="e.g., Net 30"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-credit_limit">Credit Limit (RWF)</Label>
+              <Input
+                id="edit-credit_limit"
+                type="number"
+                value={formData.credit_limit || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, credit_limit: parseFloat(e.target.value) || 0 }))}
+                placeholder="Enter credit limit"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-rating">Rating</Label>
+              <Input
+                id="edit-rating"
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                value={formData.rating || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, rating: parseFloat(e.target.value) || 0 }))}
+                placeholder="Enter rating (0-5)"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-is_active">Status</Label>
               <Select
-                value={formData.status || ''}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, status: value as any }))}
+                value={formData.is_active ? 'active' : 'inactive'}
+                onValueChange={(value: string) => setFormData(prev => ({ ...prev, is_active: value === 'active' }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -610,19 +715,8 @@ export function SupplierManagement() {
                 <SelectContent>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="md:col-span-2 space-y-2">
-              <Label htmlFor="edit-notes">Notes</Label>
-              <Textarea
-                id="edit-notes"
-                value={formData.notes || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Enter any additional notes"
-                rows={3}
-              />
             </div>
           </div>
           <DialogFooter>
@@ -646,13 +740,13 @@ export function SupplierManagement() {
                 <div className="space-y-4">
                   <div>
                     <h3 className="font-semibold text-lg">{selectedSupplier.name}</h3>
-                    <p className="text-muted-foreground">{getTypeBadge(selectedSupplier.supplierType)} {getStatusBadge(selectedSupplier.status)}</p>
+                    <p className="text-muted-foreground">{getStatusBadge(selectedSupplier.is_active)}</p>
                   </div>
                   
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{selectedSupplier.phone}</span>
+                      <span>{selectedSupplier.phone_number}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
@@ -666,43 +760,26 @@ export function SupplierManagement() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <p className="text-2xl font-bold">{selectedSupplier.totalOrders}</p>
-                      <p className="text-sm text-muted-foreground">Total Orders</p>
-                    </div>
-                    <div className="text-center p-4 bg-muted rounded-lg">
-                      <p className="text-2xl font-bold">⭐ {selectedSupplier.rating.toFixed(1)}</p>
-                      <p className="text-sm text-muted-foreground">Rating</p>
-                    </div>
-                  </div>
-                  
                   <div className="text-center p-4 bg-muted rounded-lg">
-                    <p className="text-2xl font-bold">{(selectedSupplier.totalValue / 1000).toLocaleString()} RWF</p>
-                    <p className="text-sm text-muted-foreground">Total Value</p>
+                    <p className="text-2xl font-bold">{selectedSupplier.products_count}</p>
+                    <p className="text-sm text-muted-foreground">Products</p>
                   </div>
                 </div>
               </div>
 
-              {selectedSupplier.notes && (
-                <div>
-                  <h4 className="font-semibold mb-2">Notes</h4>
-                  <p className="text-muted-foreground bg-muted p-3 rounded-lg">{selectedSupplier.notes}</p>
-                </div>
-              )}
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
                 <div>
-                  <span className="font-medium">Created:</span> {selectedSupplier.createdAt.toLocaleDateString()}
+                  <span className="font-medium">Created:</span> {new Date(selectedSupplier.created_at).toLocaleDateString()}
                 </div>
                 <div>
-                  <span className="font-medium">Last Updated:</span> {selectedSupplier.updatedAt.toLocaleDateString()}
+                  <span className="font-medium">Last Updated:</span> {new Date(selectedSupplier.updated_at).toLocaleDateString()}
                 </div>
-                {selectedSupplier.lastOrderDate && (
-                  <div>
-                    <span className="font-medium">Last Order:</span> {selectedSupplier.lastOrderDate.toLocaleDateString()}
-                  </div>
-                )}
+                <div>
+                  <span className="font-medium">Tax Number:</span> {selectedSupplier.tax_number}
+                </div>
+                <div>
+                  <span className="font-medium">Payment Terms:</span> {selectedSupplier.payment_terms}
+                </div>
               </div>
             </div>
           )}

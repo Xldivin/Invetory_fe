@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from "react";
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -23,10 +24,16 @@ import {
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Customer, InvoiceItem } from '../types';
+import { getApiUrl, getCommonHeaders, getAuthToken, getTenantId, API_CONFIG } from '../config/api';
 
 export function POSSystem() {
   const { products, customers, addCustomer, addInvoice } = useInventory();
   const { user, logActivity } = useAuth();
+  
+  // API products state
+  const [apiProducts, setApiProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [cartItems, setCartItems] = useState<InvoiceItem[]>([]);
@@ -43,13 +50,60 @@ export function POSSystem() {
     address: ''
   });
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  // Fetch products from API
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const token = getAuthToken();
+        const tenantId = getTenantId();
+
+        console.log('🛒 POS: Fetching products from:', getApiUrl(API_CONFIG.ENDPOINTS.PRODUCTS));
+
+        const response = await fetch(getApiUrl(API_CONFIG.ENDPOINTS.PRODUCTS), {
+          headers: getCommonHeaders(token, tenantId)
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch products: ${response.status}`);
+        }
+
+        const json = await response.json();
+        console.log('🛒 POS: Products response:', json);
+        
+        if (json && json.success && Array.isArray(json.data)) {
+          setApiProducts(json.data);
+        } else {
+          console.warn('🛒 POS: Unexpected response format:', json);
+          setApiProducts([]);
+        }
+      } catch (e: any) {
+        setError(e?.message || 'Failed to load products');
+        console.error('🛒 POS: Failed to load products:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
+  // Use API products if available, fallback to context products
+  const allProducts = apiProducts.length > 0 ? apiProducts : products;
+  
+  const filteredProducts = allProducts.filter(product =>
+    (product.name || product.product_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (product.sku || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const addToCart = (productId: string) => {
-    const product = products.find(p => p.id === productId);
+    // Look for product in API products first, then fallback to context products
+    const product = allProducts.find(p => 
+      (p.id === productId) || 
+      (p.product_id && String(p.product_id) === productId)
+    );
     if (!product) return;
 
     const existingItem = cartItems.find(item => item.productId === productId);
@@ -63,12 +117,12 @@ export function POSSystem() {
     } else {
       const newItem: InvoiceItem = {
         id: Date.now().toString(),
-        productId: product.id,
-        productName: product.name,
+        productId: product.id || String(product.product_id),
+        productName: product.name || product.product_name,
         quantity: 1,
-        unitPrice: product.price,
+        unitPrice: product.price || product.retail_price || 0,
         discount: 0,
-        total: product.price
+        total: product.price || product.retail_price || 0
       };
       setCartItems(prev => [...prev, newItem]);
     }
@@ -150,40 +204,107 @@ export function POSSystem() {
         {/* Products Section */}
         <div className="lg:col-span-2 space-y-4">
           {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search products by name or SKU..."
-              className="pl-10"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products by name or SKU..."
+                className="pl-10"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {/* Data source indicator */}
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {apiProducts.length > 0 
+                  ? `📡 API Products (${apiProducts.length})` 
+                  : `💾 Local Products (${products.length})`
+                }
+              </span>
+              {filteredProducts.length !== allProducts.length && (
+                <span>Showing {filteredProducts.length} of {allProducts.length}</span>
+              )}
+            </div>
           </div>
 
+          {/* Loading/Error States */}
+          {loading && (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-center">
+                <Package className="w-12 h-12 text-muted-foreground mx-auto mb-2 animate-pulse" />
+                <p className="text-muted-foreground">Loading products...</p>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center justify-center p-8">
+              <div className="text-center">
+                <Package className="w-12 h-12 text-destructive mx-auto mb-2" />
+                <p className="text-destructive mb-2">Failed to load products</p>
+                <p className="text-sm text-muted-foreground">{error}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-3"
+                  onClick={() => window.location.reload()}
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Products Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map((product) => (
-              <Card 
-                key={product.id} 
-                className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => addToCart(product.id)}
-              >
-                <CardContent className="p-4">
-                  <div className="aspect-square bg-muted rounded-lg mb-3 flex items-center justify-center">
-                    <Package className="w-8 h-8 text-muted-foreground" />
+          {!loading && !error && (
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredProducts.length > 0 ? (
+                filteredProducts.map((product) => {
+                  const productId = product.id || String(product.product_id);
+                  const productName = product.name || product.product_name;
+                  const productSku = product.sku || product.product_sku || 'No SKU';
+                  const productPrice = product.price || product.retail_price || 0;
+                  
+                  return (
+                    <Card 
+                      key={productId} 
+                      className="cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={() => addToCart(productId)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="aspect-square bg-muted rounded-lg mb-3 flex items-center justify-center">
+                          <Package className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <h3 className="text-sm truncate mb-1" title={productName}>
+                          {productName}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mb-2">{productSku}</p>
+                        <div className="flex items-center justify-between">
+                          <span>{productPrice.toLocaleString()} RWF</span>
+                          <Button size="sm" variant="secondary">
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : (
+                <div className="col-span-full flex items-center justify-center p-8">
+                  <div className="text-center">
+                    <Package className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-muted-foreground">No products found</p>
+                    {searchTerm && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Try adjusting your search term
+                      </p>
+                    )}
                   </div>
-                  <h3 className="text-sm truncate mb-1">{product.name}</h3>
-                  <p className="text-xs text-muted-foreground mb-2">{product.sku}</p>
-                  <div className="flex items-center justify-between">
-                    <span>{product.price.toLocaleString()} RWF</span>
-                    <Button size="sm" variant="secondary">
-                      <Plus className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Cart and Checkout Section */}
@@ -194,7 +315,7 @@ export function POSSystem() {
               <CardTitle className="text-lg">Customer</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Select onValueChange={(value) => {
+              <Select onValueChange={(value: string) => {
                 const customer = customers.find(c => c.id === value);
                 setSelectedCustomer(customer || null);
               }}>

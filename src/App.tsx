@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { InventoryProvider } from './contexts/InventoryContext';
@@ -22,6 +22,7 @@ import { EventsNoticeBoard } from './components/EventsNoticeBoard';
 import { ChatSystem } from './components/ChatSystem';
 import { ActivityLogs } from './components/ActivityLogs';
 import { Settings } from './components/Settings';
+import { TenantManagement as TenantManagementAdmin } from './components/TenantManagementAdmin';
 import { Toaster } from 'sonner';
 
 function AppContent() {
@@ -173,6 +174,16 @@ function AppContent() {
         }
       />
       <Route
+        path="/tenants"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TenantManagementAdmin />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/settings"
         element={
           <ProtectedRoute permission="settings.view">
@@ -188,7 +199,7 @@ function AppContent() {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/frontend">
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>

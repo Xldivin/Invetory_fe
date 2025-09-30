@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -25,46 +25,79 @@ import {
 } from 'lucide-react';
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
+import { ScrollArea } from './ui/scroll-area';
 
 export function WarehouseManagement() {
   const { warehouses, addWarehouse, updateWarehouse, products, stock, updateStock, getStock } = useInventory();
   const { user, logActivity } = useAuth();
   
-  const [showAddWarehouse, setShowAddWarehouse] = useState(false);
-  const [showStockModal, setShowStockModal] = useState(false);
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string>('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState<string>('');
-  const [stockQuantity, setStockQuantity] = useState('');
+  const [showAddWarehouse, setShowAddWarehouse] = React.useState(false);
+  const [showStockModal, setShowStockModal] = React.useState(false);
+  const [selectedWarehouse, setSelectedWarehouse] = React.useState<string>('');
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [selectedProduct, setSelectedProduct] = React.useState<string>('');
+  const [stockQuantity, setStockQuantity] = React.useState('');
   
-  const [warehouseForm, setWarehouseForm] = useState({
+  const [warehouseForm, setWarehouseForm] = React.useState({
     name: '',
-    location: '',
+    code: '',
+    address: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: '',
+    phone_number: '',
+    email: '',
     managerId: '',
     capacity: '',
+    warehouse_type: '',
+    operating_hours: '',
+    temperature_controlled: false,
+    security_level: '',
     description: ''
   });
 
   const resetWarehouseForm = () => {
     setWarehouseForm({
       name: '',
-      location: '',
+      code: '',
+      address: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      country: '',
+      phone_number: '',
+      email: '',
       managerId: '',
       capacity: '',
+      warehouse_type: '',
+      operating_hours: '',
+      temperature_controlled: false,
+      security_level: '',
       description: ''
     });
   };
 
-  const handleAddWarehouse = () => {
-    if (!warehouseForm.name || !warehouseForm.location) return;
+  const handleAddWarehouse = async () => {
+    if (!warehouseForm.name) return;
 
-    addWarehouse({
+    await addWarehouse({
       name: warehouseForm.name,
-      location: warehouseForm.location,
-      managerId: user?.id || '',
-      capacity: parseInt(warehouseForm.capacity) || 1000,
-      description: warehouseForm.description || undefined
-    });
+      code: warehouseForm.code || undefined,
+      address: warehouseForm.address || undefined,
+      city: warehouseForm.city || undefined,
+      state: warehouseForm.state || undefined,
+      postal_code: warehouseForm.postal_code || undefined,
+      country: warehouseForm.country || undefined,
+      phone_number: warehouseForm.phone_number || undefined,
+      email: warehouseForm.email || undefined,
+      managerId: (user?.id || warehouseForm.managerId || '').toString(),
+      capacity: parseFloat(warehouseForm.capacity) || 0,
+      warehouse_type: warehouseForm.warehouse_type || undefined,
+      operating_hours: warehouseForm.operating_hours || undefined,
+      temperature_controlled: warehouseForm.temperature_controlled,
+      security_level: warehouseForm.security_level || undefined,
+    } as any);
 
     logActivity('warehouse_created', 'warehouses', { name: warehouseForm.name });
     resetWarehouseForm();
@@ -126,11 +159,12 @@ export function WarehouseManagement() {
               Add Warehouse
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Warehouse</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <ScrollArea className="h-[calc(90vh-6rem)] pr-2">
+              <div className="space-y-4">
               <div>
                 <Label htmlFor="warehouseName">Warehouse Name</Label>
                 <Input
@@ -140,23 +174,144 @@ export function WarehouseManagement() {
                   placeholder="Enter warehouse name"
                 />
               </div>
-              <div>
-                <Label htmlFor="warehouseLocation">Location</Label>
-                <Input
-                  id="warehouseLocation"
-                  value={warehouseForm.location}
-                  onChange={(e) => setWarehouseForm(prev => ({ ...prev, location: e.target.value }))}
-                  placeholder="Enter location"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="warehouseCode">Code</Label>
+                  <Input
+                    id="warehouseCode"
+                    value={warehouseForm.code}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, code: e.target.value }))}
+                    placeholder="WH0001"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="warehouseType">Type</Label>
+                  <Input
+                    id="warehouseType"
+                    value={warehouseForm.warehouse_type}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, warehouse_type: e.target.value }))}
+                    placeholder="main | secondary"
+                  />
+                </div>
               </div>
               <div>
-                <Label htmlFor="warehouseCapacity">Capacity (sq ft)</Label>
+                <Label htmlFor="warehouseAddress">Address</Label>
+                <Input
+                  id="warehouseAddress"
+                  value={warehouseForm.address}
+                  onChange={(e) => setWarehouseForm(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="123 Industrial Zone"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="warehouseCity">City</Label>
+                  <Input
+                    id="warehouseCity"
+                    value={warehouseForm.city}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, city: e.target.value }))}
+                    placeholder="Kigali"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="warehouseState">State</Label>
+                  <Input
+                    id="warehouseState"
+                    value={warehouseForm.state}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, state: e.target.value }))}
+                    placeholder="Kigali"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="warehousePostal">Postal Code</Label>
+                  <Input
+                    id="warehousePostal"
+                    value={warehouseForm.postal_code}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, postal_code: e.target.value }))}
+                    placeholder="0000"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="warehouseCountry">Country</Label>
+                  <Input
+                    id="warehouseCountry"
+                    value={warehouseForm.country}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, country: e.target.value }))}
+                    placeholder="Rwanda"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="warehousePhone">Phone Number</Label>
+                  <Input
+                    id="warehousePhone"
+                    value={warehouseForm.phone_number}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                    placeholder="+250788123456"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="warehouseEmail">Email</Label>
+                  <Input
+                    id="warehouseEmail"
+                    type="email"
+                    value={warehouseForm.email}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="warehouse@company.com"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="warehouseManager">Manager ID</Label>
+                  <Input
+                    id="warehouseManager"
+                    value={warehouseForm.managerId}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, managerId: e.target.value }))}
+                    placeholder="1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="warehouseHours">Operating Hours</Label>
+                  <Input
+                    id="warehouseHours"
+                    value={warehouseForm.operating_hours}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, operating_hours: e.target.value }))}
+                    placeholder="24/7"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="warehouseSecurity">Security Level</Label>
+                  <Input
+                    id="warehouseSecurity"
+                    value={warehouseForm.security_level}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, security_level: e.target.value }))}
+                    placeholder="high | medium | low"
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <input
+                    id="warehouseTempControlled"
+                    type="checkbox"
+                    checked={warehouseForm.temperature_controlled}
+                    onChange={(e) => setWarehouseForm(prev => ({ ...prev, temperature_controlled: e.target.checked }))}
+                  />
+                  <Label htmlFor="warehouseTempControlled">Temperature Controlled</Label>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="warehouseCapacity">Capacity</Label>
                 <Input
                   id="warehouseCapacity"
                   type="number"
                   value={warehouseForm.capacity}
                   onChange={(e) => setWarehouseForm(prev => ({ ...prev, capacity: e.target.value }))}
-                  placeholder="1000"
+                  placeholder="5000"
                 />
               </div>
               <div>
@@ -168,10 +323,11 @@ export function WarehouseManagement() {
                   placeholder="Warehouse description"
                 />
               </div>
-              <Button onClick={handleAddWarehouse} className="w-full">
-                Add Warehouse
-              </Button>
-            </div>
+                <Button onClick={handleAddWarehouse} className="w-full">
+                  Add Warehouse
+                </Button>
+              </div>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       </div>
@@ -244,7 +400,7 @@ export function WarehouseManagement() {
                       Update Stock
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="max-w-[95vw] md:max-w-lg h-[80vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Update Stock Level</DialogTitle>
                     </DialogHeader>
@@ -438,3 +594,28 @@ export function WarehouseManagement() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+// {
+//   "name": "Central Warehouse",
+//   "code": "WH0001",
+//   "address": "123 Industrial Zone",
+//   "city": "Kigali",
+//   "state": "Kigali",
+//   "postal_code": "0000",
+//   "country": "Rwanda",
+//   "phone_number": "+250788123456",
+//   "email": "warehouse@company.com",
+//   "manager_id": 1,
+//   "capacity": 5000.00,
+//   "warehouse_type": "main",
+//   "operating_hours": "24/7",
+//   "temperature_controlled": true,
+//   "security_level": "high"
+// }
