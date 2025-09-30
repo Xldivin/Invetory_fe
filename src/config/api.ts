@@ -13,6 +13,7 @@ const getBaseApiUrl = (): string => {
   
   // Fallback to localhost with /api if environment variable is not set
   return 'http://localhost:8000/api';
+  
 };
 
 export const API_CONFIG = {

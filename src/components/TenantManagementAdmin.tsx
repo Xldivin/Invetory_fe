@@ -18,7 +18,9 @@ import {
   CheckCircle2,
   UserPlus,
   Settings,
-  Loader2
+  Loader2,
+  Eye,
+  Edit
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole, Permission } from '../types';
@@ -32,6 +34,10 @@ interface Tenant {
   subscription_plan: 'trial' | 'basic' | 'premium' | 'enterprise';
   contact_person: string;
   email: string;
+  status?: 'active' | 'inactive';
+  custom_domain?: string;
+  phone_number?: string;
+  company_size?: string;
   created_at: string;
   is_active: boolean;
 }
@@ -51,6 +57,20 @@ export function TenantManagement() {
   const [showAddTenant, setShowAddTenant] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [showTenantDialog, setShowTenantDialog] = useState(false);
+  const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [tenantEditForm, setTenantEditForm] = useState({
+    company_name: '',
+    subscription_plan: 'basic' as 'trial' | 'basic' | 'premium' | 'enterprise',
+    status: 'active' as 'active' | 'inactive',
+    email: '',
+    custom_domain: '',
+    phone_number: '',
+    contact_person: '',
+    company_size: ''
+  });
   
   const [tenantForm, setTenantForm] = useState<TenantForm>({
     tenant_code: '',
@@ -88,6 +108,90 @@ export function TenantManagement() {
       setTenants([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const openTenantView = (tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setShowViewDialog(true);
+  };
+
+  const openTenantDetails = (tenant: Tenant) => {
+    setSelectedTenant(tenant);
+    setTenantEditForm({
+      company_name: tenant.company_name || '',
+      subscription_plan: tenant.subscription_plan || 'basic',
+      status: tenant.is_active ? 'active' : (tenant.status || 'inactive'),
+      email: tenant.email || '',
+      custom_domain: tenant.custom_domain || '',
+      phone_number: tenant.phone_number || '',
+      contact_person: tenant.contact_person || '',
+      company_size: tenant.company_size || ''
+    });
+    setShowTenantDialog(true);
+  };
+
+  const handleUpdateTenant = async () => {
+    if (!selectedTenant?.tenant_id) {
+      console.error('No tenant ID available for update');
+      return;
+    }
+
+    // Validation
+    if (!tenantEditForm.company_name || !tenantEditForm.email || !tenantEditForm.contact_person) {
+      alert('Please fill in all required fields (Company Name, Email, Contact Person)');
+      return;
+    }
+
+    try {
+      setUpdateLoading(true);
+      const token = getAuthToken();
+      const payload = {
+        company_name: tenantEditForm.company_name,
+        subscription_plan: tenantEditForm.subscription_plan,
+        status: tenantEditForm.status,
+        email: tenantEditForm.email,
+        custom_domain: tenantEditForm.custom_domain || undefined,
+        phone_number: tenantEditForm.phone_number || undefined,
+        contact_person: tenantEditForm.contact_person || undefined,
+        company_size: tenantEditForm.company_size || undefined
+      };
+
+      console.log('Updating tenant ID:', selectedTenant.tenant_id);
+      console.log('Update payload:', payload);
+      console.log('API URL:', getApiUrl(`${API_CONFIG.ENDPOINTS.TENANTS}/${selectedTenant.tenant_id}`));
+      console.log('Headers:', getCommonHeaders(token));
+
+      const response = await fetch(
+        getApiUrl(`${API_CONFIG.ENDPOINTS.TENANTS}/${selectedTenant.tenant_id}`),
+        {
+          method: 'PUT',
+          headers: getCommonHeaders(token),
+          body: JSON.stringify(payload)
+        }
+      );
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok && data.success) {
+        await fetchTenants();
+        logActivity('tenant_updated', 'tenants', { tenant_id: selectedTenant.tenant_id });
+        setShowTenantDialog(false);
+        setSelectedTenant(null);
+        alert('Tenant updated successfully!');
+      } else {
+        console.error('Update failed:', data);
+        alert(data.message || `Failed to update tenant. Status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Error updating tenant:', error);
+      alert('Failed to update tenant');
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
@@ -215,6 +319,60 @@ export function TenantManagement() {
         {plan.charAt(0).toUpperCase() + plan.slice(1)}
       </Badge>
     );
+  };
+
+  // Build friendly, non-null view entries for the read-only dialog
+  const getTenantViewEntries = (tenant: Tenant | null) => {
+    if (!tenant) return [] as Array<{ label: string; value: React.ReactNode }>;
+
+    const labelMap: Record<string, string> = {
+      tenant_id: 'Tenant ID',
+      tenant_code: 'Tenant Code',
+      company_name: 'Company Name',
+      subscription_plan: 'Subscription Plan',
+      contact_person: 'Contact Person',
+      email: 'Email',
+      status: 'Status',
+      is_active: 'Active',
+      custom_domain: 'Custom Domain',
+      phone_number: 'Phone Number',
+      company_size: 'Company Size',
+      created_at: 'Created At'
+    };
+
+    const rawEntries: Array<{ key: keyof Tenant; value: any }> = [
+      { key: 'tenant_id', value: tenant.tenant_id },
+      { key: 'tenant_code', value: tenant.tenant_code },
+      { key: 'company_name', value: tenant.company_name },
+      { key: 'subscription_plan', value: tenant.subscription_plan },
+      { key: 'contact_person', value: tenant.contact_person },
+      { key: 'email', value: tenant.email },
+      { key: 'status', value: tenant.status },
+      { key: 'is_active', value: tenant.is_active },
+      { key: 'custom_domain', value: tenant.custom_domain },
+      { key: 'phone_number', value: tenant.phone_number },
+      { key: 'company_size', value: tenant.company_size },
+      { key: 'created_at', value: tenant.created_at }
+    ];
+
+    const formatted = rawEntries
+      .map(({ key, value }) => {
+        let display: React.ReactNode = value as any;
+        if (value === null || value === undefined || value === '') return null;
+        if (key === 'subscription_plan' && typeof value === 'string') {
+          display = value.charAt(0).toUpperCase() + value.slice(1);
+        } else if (key === 'is_active') {
+          display = value ? 'active' : 'inactive';
+        } else if (key === 'created_at' && typeof value === 'string') {
+          const d = new Date(value);
+          display = isNaN(d.getTime()) ? value : d.toLocaleString();
+        }
+
+        return { label: labelMap[key as string] || (key as string), value: display };
+      })
+      .filter(Boolean) as Array<{ label: string; value: React.ReactNode }>;
+
+    return formatted;
   };
 
   if (currentUser?.role !== 'super_admin') {
@@ -460,6 +618,26 @@ export function TenantManagement() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openTenantView(tenant)}
+                        title="View Details"
+                        className="hover:bg-muted"
+                        disabled={loading}
+                      >
+                        <Eye className="w-4 h-4 text-blue-600" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openTenantDetails(tenant)}
+                        title="Update Tenant"
+                        className="hover:bg-muted"
+                        disabled={loading}
+                      >
+                        <Edit className="w-4 h-4 text-green-600" />
+                      </Button>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -486,6 +664,154 @@ export function TenantManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Tenant Details / Edit Dialog */}
+      <Dialog open={showTenantDialog} onOpenChange={setShowTenantDialog}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Tenant Details{selectedTenant ? ` - ${selectedTenant.company_name}` : ''}</DialogTitle>
+            <DialogDescription>View and update tenant information.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editCompanyName">Company Name</Label>
+                <Input
+                  id="editCompanyName"
+                  value={tenantEditForm.company_name}
+                  onChange={(e) => setTenantEditForm(prev => ({ ...prev, company_name: e.target.value }))}
+                  placeholder="Company name"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editSubscription">Subscription Plan</Label>
+                <Select value={tenantEditForm.subscription_plan} onValueChange={(value: 'trial' | 'basic' | 'premium' | 'enterprise') => setTenantEditForm(prev => ({ ...prev, subscription_plan: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="trial">Trial</SelectItem>
+                    <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="premium">Premium</SelectItem>
+                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editStatus">Status</Label>
+                <Select value={tenantEditForm.status} onValueChange={(value: 'active' | 'inactive') => setTenantEditForm(prev => ({ ...prev, status: value }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="editEmail">Email</Label>
+                <Input
+                  id="editEmail"
+                  type="email"
+                  value={tenantEditForm.email}
+                  onChange={(e) => setTenantEditForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="contact@company.com"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editDomain">Custom Domain</Label>
+                <Input
+                  id="editDomain"
+                  value={tenantEditForm.custom_domain}
+                  onChange={(e) => setTenantEditForm(prev => ({ ...prev, custom_domain: e.target.value }))}
+                  placeholder="store.example.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editPhone">Phone Number</Label>
+                <Input
+                  id="editPhone"
+                  value={tenantEditForm.phone_number}
+                  onChange={(e) => setTenantEditForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                  placeholder="+250..."
+                  maxLength={20}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editContact">Contact Person</Label>
+                <Input
+                  id="editContact"
+                  value={tenantEditForm.contact_person}
+                  onChange={(e) => setTenantEditForm(prev => ({ ...prev, contact_person: e.target.value }))}
+                  placeholder="Full name"
+                  maxLength={150}
+                />
+              </div>
+              <div>
+                <Label htmlFor="editSize">Company Size</Label>
+                <Select value={tenantEditForm.company_size} onValueChange={(value: string) => setTenantEditForm(prev => ({ ...prev, company_size: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select company size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1-10">1-10</SelectItem>
+                    <SelectItem value="11-50">11-50</SelectItem>
+                    <SelectItem value="51-200">51-200</SelectItem>
+                    <SelectItem value="201-1000">201-1000</SelectItem>
+                    <SelectItem value="1000+">1000+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowTenantDialog(false)} disabled={updateLoading}>Close</Button>
+              <Button onClick={handleUpdateTenant} disabled={updateLoading}>
+                {updateLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View-only Tenant Details Dialog */}
+      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Tenant Information{selectedTenant ? ` - ${selectedTenant.company_name}` : ''}</DialogTitle>
+            <DialogDescription>Read-only view of tenant details.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {(() => {
+              const entries = getTenantViewEntries(selectedTenant);
+              return (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {entries.map((item, index) => (
+                    <div key={index}>
+                      <Label>{item.label}</Label>
+                      <p className="text-sm mt-1">{item.value}</p>
+              </div>
+                  ))}
+              </div>
+              );
+            })()}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setShowViewDialog(false)}>Close</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Switch } from './ui/switch';
 import { Checkbox } from './ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { 
   Users, 
   Plus, 
@@ -22,7 +23,9 @@ import {
   EyeOff,
   UserPlus,
   Settings,
-  Loader2
+  Loader2,
+  Edit,
+  KeyRound
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole } from '../types';
@@ -61,6 +64,30 @@ interface UsersApiResponse {
   message?: string;
 }
 
+// Role management interfaces
+interface Role {
+  id: string;
+  role_id: string;
+  name: string;
+  display_name?: string;
+  description?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+interface RoleApiResponse {
+  success: boolean;
+  data: Role[];
+  message?: string;
+}
+
+interface RoleForm {
+  name: string;
+  display_name: string;
+  description: string;
+  permissions: string[];
+}
+
 export function UserManagement() {
   const { user: currentUser, logActivity, hasPermission } = useAuth();
   
@@ -81,6 +108,15 @@ export function UserManagement() {
   // Tenants state
   const [tenants, setTenants] = useState<Array<{id: string, name: string}>>([]);
   
+  // Role management state
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [showAddRole, setShowAddRole] = useState(false);
+  const [showEditRole, setShowEditRole] = useState(false);
+  const [showRolePermissions, setShowRolePermissions] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [rolePermissions, setRolePermissions] = useState<string[]>([]);
+  const [roleSearchTerm, setRoleSearchTerm] = useState('');
+  
   const [userForm, setUserForm] = useState({
     name: '',
     email: '',
@@ -90,6 +126,13 @@ export function UserManagement() {
     pin: '',
     generatePin: true,
     tenant_id: 'none'
+  });
+
+  const [roleForm, setRoleForm] = useState<RoleForm>({
+    name: '',
+    display_name: '',
+    description: '',
+    permissions: []
   });
 
   const resetUserForm = () => {
@@ -251,13 +294,16 @@ export function UserManagement() {
         }));
         console.log('Transformed tenants:', transformedTenants);
         setTenants(transformedTenants);
+        return transformedTenants; // Return the tenants data
       } else {
         console.error('Failed to fetch tenants:', data.message);
         setTenants([]);
+        return [];
       }
     } catch (error) {
       console.error('Error fetching tenants:', error);
       setTenants([]);
+      return [];
     }
   };
 
@@ -284,16 +330,35 @@ export function UserManagement() {
       console.log('Users API response:', data);
       
       if (response.ok && data.success) {
+        console.log('=== USER TRANSFORMATION DEBUG ===');
+        console.log('Available tenants for matching:', tenants);
+        console.log('Users data from API:', data.data);
+        
         // Transform API users to our User interface
-        const transformedUsers: User[] = data.data.map((apiUser: ApiUser) => ({
-          id: apiUser.user_id || apiUser.id || '', // Use user_id first, then id as fallback
-          name: apiUser.full_name,
-          email: apiUser.email,
-          role: apiUser.role,
-          pin: apiUser.pin || '',
-          createdAt: new Date(apiUser.created_at),
-          lastLogin: apiUser.last_login_at ? new Date(apiUser.last_login_at) : undefined
-        }));
+        const transformedUsers: User[] = data.data.map((apiUser: ApiUser) => {
+          // Find tenant information if tenant_id exists
+          // Convert both IDs to strings for comparison since API might return numbers
+          const tenant = apiUser.tenant_id ? tenants.find(t => t.id === String(apiUser.tenant_id)) : null;
+          
+          console.log('User transformation debug:', {
+            userId: apiUser.user_id,
+            tenantId: apiUser.tenant_id,
+            tenantIdType: typeof apiUser.tenant_id,
+            availableTenants: tenants.map(t => ({ id: t.id, name: t.name, idType: typeof t.id })),
+            foundTenant: tenant
+          });
+          
+          return {
+            id: apiUser.user_id || apiUser.id || '', // Use user_id first, then id as fallback
+            name: apiUser.full_name,
+            email: apiUser.email,
+            role: apiUser.role,
+            pin: apiUser.pin || '',
+            createdAt: new Date(apiUser.created_at),
+            lastLogin: apiUser.last_login_at ? new Date(apiUser.last_login_at) : undefined,
+            tenant: tenant ? { id: tenant.id, name: tenant.name } : undefined
+          };
+        });
         
         console.log('Transformed users:', transformedUsers);
         console.log('First user ID check:', transformedUsers[0]?.id, 'Type:', typeof transformedUsers[0]?.id);
@@ -499,21 +564,303 @@ export function UserManagement() {
     }
   };
 
-  // Fetch users, tenants and permissions catalog on component mount
+  // Role management functions
+  const fetchRoles = async () => {
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      const url = getApiUrl('/roles');
+      const headers = getCommonHeaders(token);
+      
+      console.log('=== FETCH ROLES DEBUG ===');
+      console.log('URL:', url);
+      console.log('Headers:', headers);
+      console.log('Token present:', !!token);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const data: RoleApiResponse = await response.json();
+      console.log('Roles API response:', data);
+      
+      if (response.ok && data.success) {
+        console.log('Fetched roles:', data.data);
+        setRoles(data.data);
+      } else {
+        console.error('Failed to fetch roles:', data.message);
+        setRoles([]);
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      setRoles([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddRole = async () => {
+    if (!roleForm.name.trim() || !roleForm.display_name.trim()) {
+      alert('Please enter both role name and display name');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      const url = getApiUrl('/roles');
+      const headers = getCommonHeaders(token);
+      const body = JSON.stringify(roleForm);
+      
+      console.log('=== ADD ROLE DEBUG ===');
+      console.log('Role Form:', roleForm);
+      console.log('URL:', url);
+      console.log('Headers:', headers);
+      console.log('Body:', body);
+      console.log('Token present:', !!token);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (response.ok && data.success) {
+        await fetchRoles();
+        logActivity('role_created', 'roles', { name: roleForm.name });
+        setRoleForm({ name: '', display_name: '', description: '', permissions: [] });
+        setShowAddRole(false);
+        alert('Role created successfully!');
+      } else {
+        console.error('Add role failed:', data);
+        alert(data.message || 'Failed to create role');
+      }
+    } catch (error) {
+      console.error('Error creating role:', error);
+      alert('Failed to create role');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditRole = async () => {
+    if (!selectedRole?.role_id || !roleForm.name.trim() || !roleForm.display_name.trim()) {
+      alert('Please enter both role name and display name');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      const url = getApiUrl(`/roles/${selectedRole.role_id}`);
+      const headers = getCommonHeaders(token);
+      const body = JSON.stringify(roleForm);
+      
+      console.log('=== EDIT ROLE DEBUG ===');
+      console.log('Selected Role:', selectedRole);
+      console.log('Role Form:', roleForm);
+      console.log('URL:', url);
+      console.log('Headers:', headers);
+      console.log('Body:', body);
+      console.log('Token present:', !!token);
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers,
+        body
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (response.ok && data.success) {
+        await fetchRoles();
+        logActivity('role_updated', 'roles', { role_id: selectedRole.role_id, name: roleForm.name });
+        setShowEditRole(false);
+        setSelectedRole(null);
+        setRoleForm({ name: '', display_name: '', description: '', permissions: [] });
+        alert('Role updated successfully!');
+      } else {
+        console.error('Edit role failed:', data);
+        alert(data.message || 'Failed to update role');
+      }
+    } catch (error) {
+      console.error('Error updating role:', error);
+      alert('Failed to update role');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteRole = async (role: Role) => {
+    if (!role.role_id) {
+      alert('Error: Role ID is missing. Cannot delete this role.');
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete the role "${role.name}"?`)) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      const url = getApiUrl(`/roles/${role.role_id}`);
+      const headers = getCommonHeaders(token);
+      
+      console.log('=== DELETE ROLE DEBUG ===');
+      console.log('Role to delete:', role);
+      console.log('URL:', url);
+      console.log('Headers:', headers);
+      console.log('Token present:', !!token);
+      
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (response.ok && data.success) {
+        await fetchRoles();
+        logActivity('role_deleted', 'roles', { role_id: role.role_id, name: role.name });
+        alert(`Role "${role.name}" has been deleted successfully.`);
+      } else {
+        console.error('Delete role failed:', data);
+        alert(data.message || 'Failed to delete role');
+      }
+    } catch (error) {
+      console.error('Error deleting role:', error);
+      alert('Failed to delete role');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchRolePermissions = async (roleId: string) => {
+    try {
+      const token = getAuthToken();
+      const url = getApiUrl(`/roles/${roleId}/permissions`);
+      const headers = getCommonHeaders(token);
+      
+      console.log('=== FETCH ROLE PERMISSIONS DEBUG ===');
+      console.log('Role ID:', roleId);
+      console.log('URL:', url);
+      console.log('Headers:', headers);
+      console.log('Token present:', !!token);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (response.ok && data.success) {
+        const permissions = data.data?.permissions || [];
+        console.log('Fetched permissions:', permissions);
+        setRolePermissions(Array.isArray(permissions) ? permissions : []);
+      } else {
+        console.error('Failed to fetch role permissions:', data.message);
+        setRolePermissions([]);
+      }
+    } catch (error) {
+      console.error('Error fetching role permissions:', error);
+      setRolePermissions([]);
+    }
+  };
+
+  const handleUpdateRolePermissions = async (roleId: string, permissions: string[]) => {
+    try {
+      setLoading(true);
+      const token = getAuthToken();
+      const url = getApiUrl(`/roles/${roleId}/permissions`);
+      const headers = getCommonHeaders(token);
+      const body = JSON.stringify({ permissions });
+      
+      console.log('=== UPDATE ROLE PERMISSIONS DEBUG ===');
+      console.log('Role ID:', roleId);
+      console.log('Permissions:', permissions);
+      console.log('URL:', url);
+      console.log('Headers:', headers);
+      console.log('Body:', body);
+      console.log('Token present:', !!token);
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body
+      });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      const data = await response.json();
+      console.log('Response data:', data);
+      
+      if (response.ok && data.success) {
+        logActivity('role_permissions_updated', 'roles', { 
+          role_id: roleId,
+          permissions_count: permissions.length 
+        });
+        setShowRolePermissions(false);
+        setSelectedRole(null);
+        alert('Role permissions updated successfully!');
+      } else {
+        console.error('Update role permissions failed:', data);
+        alert(data.message || 'Failed to update role permissions');
+      }
+    } catch (error) {
+      console.error('Error updating role permissions:', error);
+      alert('Failed to update role permissions');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetRoleForm = () => {
+    setRoleForm({ name: '', display_name: '', description: '', permissions: [] });
+  };
+
+  // Fetch users, tenants, roles and permissions catalog on component mount
   useEffect(() => {
     console.log('useEffect triggered - hasPermission users.view:', hasPermission('users.view'));
     if (hasPermission('users.view')) {
-      console.log('Fetching users, tenants and permissions catalog...');
-      fetchUsers();
-      fetchTenants();
-      fetchPermissionsCatalog();
+      console.log('Fetching tenants first, then users, roles and permissions catalog...');
+      // Fetch tenants first, then users to ensure tenant data is available for user transformation
+      fetchTenants().then(() => {
+        fetchUsers();
+        fetchRoles();
+        fetchPermissionsCatalog();
+      });
     } else {
       console.log('No permission to view users, skipping fetch');
     }
   }, [hasPermission]);
 
   const getRoleBadge = (role: UserRole) => {
-    const roleColors: Record<UserRole, string> = {
+    const roleColors: Record<string, string> = {
       super_admin: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300',
       tenant_admin: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-300',
       admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300',
@@ -522,7 +869,7 @@ export function UserManagement() {
       custom: 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300'
     };
 
-    const roleNames: Record<UserRole, string> = {
+    const roleNames: Record<string, string> = {
       super_admin: 'Super Admin',
       tenant_admin: 'Tenant Admin',
       admin: 'Admin',
@@ -532,10 +879,10 @@ export function UserManagement() {
     };
 
     return (
-      <Badge className={roleColors[role]}>
+      <Badge className={roleColors[role] || roleColors.custom}>
         {role === 'super_admin' && <ShieldCheck className="w-3 h-3 mr-1" />}
         {(role === 'admin' || role === 'custom') && <Shield className="w-3 h-3 mr-1" />}
-        {roleNames[role]}
+        {roleNames[role] || role}
       </Badge>
     );
   };
@@ -555,6 +902,11 @@ export function UserManagement() {
       if (statusFilter === 'active_week') return daysSinceLogin <= 7;
       return daysSinceLogin > 7; // inactive
     });
+
+  const filteredRoles = roles.filter(role =>
+    role.name.toLowerCase().includes(roleSearchTerm.toLowerCase()) ||
+    (role.description && role.description.toLowerCase().includes(roleSearchTerm.toLowerCase()))
+  );
 
   const getStatusBadge = (user: User) => {
     if (!user.lastLogin) {
@@ -590,8 +942,30 @@ export function UserManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1>User Management</h1>
-          <p className="text-muted-foreground">Manage system users and their permissions</p>
+          <p className="text-muted-foreground">Manage system users, roles and their permissions</p>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            User Management
+          </TabsTrigger>
+          <TabsTrigger value="roles" className="flex items-center gap-2">
+            <KeyRound className="w-4 h-4" />
+            Role Management
+          </TabsTrigger>
+        </TabsList>
+
+        {/* User Management Tab */}
+        <TabsContent value="users" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2>Users</h2>
+              <p className="text-muted-foreground">Manage system users and their permissions</p>
+            </div>
         <Dialog open={showAddUser} onOpenChange={(open: boolean | ((prevState: boolean) => boolean)) => {
           setShowAddUser(open);
           if (!open) {
@@ -783,6 +1157,7 @@ export function UserManagement() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Tenant</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>PIN</TableHead>
                 <TableHead>Last Login</TableHead>
@@ -805,6 +1180,15 @@ export function UserManagement() {
                     </div>
                   </TableCell>
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
+                  <TableCell>
+                    {user.tenant ? (
+                      <Badge variant="outline" className="text-xs">
+                        {user.tenant.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No tenant</span>
+                    )}
+                  </TableCell>
                   <TableCell>{getStatusBadge(user)}</TableCell>
                   <TableCell>
                     <code className="text-sm">
@@ -945,6 +1329,381 @@ export function UserManagement() {
           </div>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        {/* Role Management Tab */}
+        <TabsContent value="roles" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2>Roles</h2>
+              <p className="text-muted-foreground">Manage system roles and their permissions</p>
+            </div>
+            <Dialog open={showAddRole} onOpenChange={(open: boolean | ((prevState: boolean) => boolean)) => {
+              setShowAddRole(open);
+              if (!open) {
+                resetRoleForm();
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button disabled={!hasPermission('users.create')}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Role
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Add New Role</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="roleName">Role Name *</Label>
+                    <Input
+                      id="roleName"
+                      value={roleForm.name}
+                      onChange={(e) => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g., custom_manager"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="roleDisplayName">Display Name *</Label>
+                    <Input
+                      id="roleDisplayName"
+                      value={roleForm.display_name}
+                      onChange={(e) => setRoleForm(prev => ({ ...prev, display_name: e.target.value }))}
+                      placeholder="e.g., Custom Manager"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="roleDescription">Description</Label>
+                    <Input
+                      id="roleDescription"
+                      value={roleForm.description}
+                      onChange={(e) => setRoleForm(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter role description"
+                    />
+                  </div>
+                  <div>
+                    <Label>Permissions</Label>
+                    <div className="max-h-48 overflow-y-auto border rounded-md p-3 space-y-2">
+                      {permissionsCatalog.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Loading permissions...</p>
+                      ) : (
+                        Object.entries(
+                          permissionsCatalog.reduce((acc, perm) => {
+                            if (perm && perm.module) {
+                              if (!acc[perm.module]) acc[perm.module] = [];
+                              acc[perm.module].push(perm);
+                            }
+                            return acc;
+                          }, {} as Record<string, PermissionCatalogItem[]>)
+                        ).map(([module, permissions]) => (
+                          <div key={module} className="space-y-1">
+                            <h4 className="text-sm font-medium capitalize">{module}</h4>
+                            <div className="space-y-1 ml-2">
+                              {permissions.map((permission) => (
+                                <div key={permission.id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`add-role-${permission.id}`}
+                                    checked={roleForm.permissions.includes(permission.name)}
+                                    onCheckedChange={(checked: boolean) => {
+                                      if (checked) {
+                                        setRoleForm(prev => ({
+                                          ...prev,
+                                          permissions: [...prev.permissions, permission.name]
+                                        }));
+                                      } else {
+                                        setRoleForm(prev => ({
+                                          ...prev,
+                                          permissions: prev.permissions.filter(p => p !== permission.name)
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                  <label
+                                    htmlFor={`add-role-${permission.id}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                  >
+                                    {permission.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  <Button onClick={handleAddRole} className="w-full" disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Add Role
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Role Search */}
+          <div className="flex items-center justify-between">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search roles..."
+                className="pl-10"
+                value={roleSearchTerm}
+                onChange={(e) => setRoleSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center gap-4">
+              <Badge variant="secondary">{filteredRoles.length} Roles</Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchRoles()}
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Settings className="w-4 h-4 mr-2" />}
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Roles Table */}
+          <Card>
+            <CardHeader>
+              <CardTitle>System Roles</CardTitle>
+              <CardDescription>Manage role definitions and their permissions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading && roles.length === 0 ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <span className="ml-2">Loading roles...</span>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Role Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRoles.map((role) => (
+                      <TableRow key={role.role_id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar>
+                              <AvatarFallback>{(role.display_name || role.name).charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="text-sm font-medium">{role.display_name || role.name}</div>
+                              <div className="text-xs text-muted-foreground">{role.name}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {role.description || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {new Date(role.created_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedRole(role);
+                                setRoleForm({ 
+                                  name: role.name, 
+                                  display_name: role.display_name || role.name,
+                                  description: role.description || '',
+                                  permissions: []
+                                });
+                                setShowEditRole(true);
+                              }}
+                              disabled={!hasPermission('users.edit') || loading}
+                              title="Edit Role"
+                              className="hover:bg-muted"
+                            >
+                              <Edit className="w-4 h-4 text-blue-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedRole(role);
+                                fetchRolePermissions(role.role_id);
+                                if (permissionsCatalog.length === 0) {
+                                  fetchPermissionsCatalog();
+                                }
+                                setShowRolePermissions(true);
+                              }}
+                              disabled={!hasPermission('users.edit') || loading}
+                              title="Manage Permissions"
+                              className="hover:bg-muted"
+                            >
+                              <Shield className="w-4 h-4 text-green-600" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteRole(role)}
+                              className="text-destructive hover:text-destructive hover:bg-red-50"
+                              disabled={!hasPermission('users.delete') || loading}
+                              title="Delete Role"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredRoles.length === 0 && !loading && (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                          No roles found
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Edit Role Dialog */}
+          <Dialog open={showEditRole} onOpenChange={setShowEditRole}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Role</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="editRoleName">Role Name *</Label>
+                  <Input
+                    id="editRoleName"
+                    value={roleForm.name}
+                    onChange={(e) => setRoleForm(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="e.g., custom_manager"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editRoleDisplayName">Display Name *</Label>
+                  <Input
+                    id="editRoleDisplayName"
+                    value={roleForm.display_name}
+                    onChange={(e) => setRoleForm(prev => ({ ...prev, display_name: e.target.value }))}
+                    placeholder="e.g., Custom Manager"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editRoleDescription">Description</Label>
+                  <Input
+                    id="editRoleDescription"
+                    value={roleForm.description}
+                    onChange={(e) => setRoleForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Enter role description"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowEditRole(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleEditRole} disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Update Role
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* Role Permissions Management Dialog */}
+          <Dialog open={showRolePermissions} onOpenChange={setShowRolePermissions}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  Manage Permissions - {selectedRole?.name}
+                </DialogTitle>
+                <DialogDescription>
+                  Configure the specific permissions for this role.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {!Array.isArray(permissionsCatalog) || permissionsCatalog.length === 0 ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span className="ml-2">Loading permissions...</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(
+                      Array.isArray(permissionsCatalog) 
+                        ? permissionsCatalog.reduce((acc, perm) => {
+                            if (perm && perm.module) {
+                              if (!acc[perm.module]) acc[perm.module] = [];
+                              acc[perm.module].push(perm);
+                            }
+                            return acc;
+                          }, {} as Record<string, PermissionCatalogItem[]>) 
+                        : {}
+                    ).map(([module, permissions]) => (
+                      <Card key={module}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base capitalize">{module}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {permissions.map((permission) => (
+                            <div key={permission.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`role-${permission.id}`}
+                                checked={rolePermissions.includes(permission.name)}
+                                onCheckedChange={(checked: boolean) => {
+                                  if (checked) {
+                                    setRolePermissions(prev => [...prev, permission.name]);
+                                  } else {
+                                    setRolePermissions(prev => prev.filter(p => p !== permission.name));
+                                  }
+                                }}
+                              />
+                              <div className="grid gap-1.5 leading-none">
+                                <label
+                                  htmlFor={`role-${permission.id}`}
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {permission.name}
+                                </label>
+                                <p className="text-xs text-muted-foreground">
+                                  {permission.description}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button variant="outline" onClick={() => setShowRolePermissions(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => selectedRole && handleUpdateRolePermissions(selectedRole.role_id, rolePermissions)}
+                    disabled={loading}
+                  >
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Update Permissions
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

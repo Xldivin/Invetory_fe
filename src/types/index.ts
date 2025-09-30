@@ -8,6 +8,10 @@ export interface User {
   avatar?: string;
   createdAt: Date;
   lastLogin?: Date;
+  tenant?: {
+    id: string;
+    name: string;
+  };
 }
 
 export type UserRole = 'super_admin' | 'tenant_admin' | 'admin' | 'warehouse_manager' | 'shop_manager' | 'custom';
