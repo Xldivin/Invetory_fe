@@ -152,14 +152,43 @@ export function UserManagement() {
     return Math.floor(1000 + Math.random() * 9000).toString();
   };
 
+  const generateRandomPassword = (length: number = 12) => {
+    const uppercaseChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercaseChars = 'abcdefghijklmnopqrstuvwxyz';
+    const numberChars = '0123456789';
+    const symbolChars = '!@#$%^&*()-_=+[]{};:,.<>?';
+    const allChars = uppercaseChars + lowercaseChars + numberChars + symbolChars;
+
+    // Ensure password has at least one of each category
+    const required = [
+      uppercaseChars[Math.floor(Math.random() * uppercaseChars.length)],
+      lowercaseChars[Math.floor(Math.random() * lowercaseChars.length)],
+      numberChars[Math.floor(Math.random() * numberChars.length)],
+      symbolChars[Math.floor(Math.random() * symbolChars.length)]
+    ];
+
+    const remainingLength = Math.max(0, length - required.length);
+    const remaining = Array.from({ length: remainingLength }, () =>
+      allChars[Math.floor(Math.random() * allChars.length)]
+    );
+
+    const passwordArray = [...required, ...remaining];
+    // Shuffle
+    for (let i = passwordArray.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [passwordArray[i], passwordArray[j]] = [passwordArray[j], passwordArray[i]];
+    }
+    return passwordArray.join('');
+  };
+
   const handleAddUser = async () => {
-    if (!userForm.name || !userForm.email || !userForm.password || !userForm.password_confirmation) {
-      alert('Please fill in all required fields (Name, Email, Password, Password Confirmation)');
+    if (!userForm.name || !userForm.email) {
+      alert('Please fill in all required fields (Full Name and Email)');
       return;
     }
 
-    if (userForm.password !== userForm.password_confirmation) {
-      alert('Passwords do not match. Please check your password confirmation.');
+    if (!userForm.generatePin) {
+      alert('Enable "Generate random PIN & Password" to create user credentials.');
       return;
     }
 
@@ -168,12 +197,17 @@ export function UserManagement() {
       const token = getAuthToken();
       const tenantId = getTenantId();
       
+      // Auto-generate credentials when toggle is enabled
+      const generatedPin = generateRandomPin();
+      const generatedPassword = generateRandomPassword();
+
       const userData = {
         full_name: userForm.name,
         email: userForm.email,
-        password: userForm.password,
-        password_confirmation: userForm.password_confirmation,
+        password: generatedPassword,
+        password_confirmation: generatedPassword,
         role: userForm.role,
+        pin: generatedPin,
         tenant_id: userForm.tenant_id === 'none' ? undefined : userForm.tenant_id
       };
 
@@ -978,7 +1012,7 @@ export function UserManagement() {
               Add User
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 Add New User
@@ -1005,26 +1039,6 @@ export function UserManagement() {
                 />
               </div>
               <div>
-                <Label htmlFor="userPassword">Password</Label>
-                <Input
-                  id="userPassword"
-                  type="password"
-                  value={userForm.password}
-                  onChange={(e) => setUserForm(prev => ({ ...prev, password: e.target.value }))}
-                  placeholder="Enter password"
-                />
-              </div>
-              <div>
-                <Label htmlFor="userPasswordConfirm">Confirm Password</Label>
-                <Input
-                  id="userPasswordConfirm"
-                  type="password"
-                  value={userForm.password_confirmation}
-                  onChange={(e) => setUserForm(prev => ({ ...prev, password_confirmation: e.target.value }))}
-                  placeholder="Confirm password"
-                />
-              </div>
-              <div>
                 <Label htmlFor="userRole">Role</Label>
                 <Select value={userForm.role} onValueChange={(value: UserRole) => setUserForm(prev => ({ ...prev, role: value }))}>
                   <SelectTrigger>
@@ -1032,14 +1046,14 @@ export function UserManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     {currentUser?.role === 'super_admin' && (
-                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
                     )}
                     <SelectItem value="warehouse_manager">Warehouse Manager</SelectItem>
                     <SelectItem value="shop_manager">Shop Manager</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-                  <div>
+              <div>
                 <Label htmlFor="userTenant">Tenant (Optional)</Label>
                 <Select value={userForm.tenant_id} onValueChange={(value: string) => setUserForm(prev => ({ ...prev, tenant_id: value }))}>
                   <SelectTrigger>
@@ -1059,6 +1073,16 @@ export function UserManagement() {
                     No tenants available. Check console for API response.
                   </p>
                 )}
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <Label>Generate random PIN & Password</Label>
+                  <p className="text-xs text-muted-foreground">Credentials will be created automatically and can be viewed by admins.</p>
+                </div>
+                <Switch
+                  checked={userForm.generatePin}
+                  onCheckedChange={(checked: boolean) => setUserForm(prev => ({ ...prev, generatePin: checked }))}
+                />
               </div>
               <Button 
                 onClick={handleAddUser} 

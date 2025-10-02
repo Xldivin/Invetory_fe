@@ -174,7 +174,7 @@
 
 import * as React from "react";
 import { useEffect, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -352,7 +352,7 @@ export function LoginForm() {
           </Tabs>
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Demo: use your backend credentials</p>
+            <p>Don't have an account? <Link to="/register" className="text-primary hover:underline">Sign up</Link></p>
           </div>
         </CardContent>
       </Card>

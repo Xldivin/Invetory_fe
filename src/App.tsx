@@ -7,6 +7,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginForm } from './components/LoginForm';
+import { RegisterForm } from './components/RegisterForm';
 import { Dashboard } from './components/Dashboard';
 import { POSSystem } from './components/POSSystem';
 import { ProductManagement } from './components/ProductManagement';
@@ -28,8 +29,9 @@ import { Toaster } from 'sonner';
 function AppContent() {
   return (
     <Routes>
-      {/* Login route without layout */}
+      {/* Auth routes without layout */}
       <Route path="/login" element={<LoginForm />} />
+      <Route path="/register" element={<RegisterForm />} />
       
       {/* Protected routes with layout */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { User, UserRole, Permission } from '../types';
 import { getApiUrl, getCommonHeaders, getAuthToken, getTenantId, API_CONFIG } from '../config/api';
+import { TenantDetailsPage } from './TenantDetailsPage';
 
 // Interfaces for API data structures
 interface Tenant {
@@ -57,9 +58,10 @@ export function TenantManagement() {
   const [showAddTenant, setShowAddTenant] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showViewDialog, setShowViewDialog] = useState(false);
   const [showTenantDialog, setShowTenantDialog] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<Tenant | null>(null);
+  const [showTenantDetails, setShowTenantDetails] = useState(false);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [tenantEditForm, setTenantEditForm] = useState({
     company_name: '',
@@ -112,8 +114,8 @@ export function TenantManagement() {
   };
 
   const openTenantView = (tenant: Tenant) => {
-    setSelectedTenant(tenant);
-    setShowViewDialog(true);
+    setSelectedTenantId(tenant.tenant_id);
+    setShowTenantDetails(true);
   };
 
   const openTenantDetails = (tenant: Tenant) => {
@@ -321,59 +323,6 @@ export function TenantManagement() {
     );
   };
 
-  // Build friendly, non-null view entries for the read-only dialog
-  const getTenantViewEntries = (tenant: Tenant | null) => {
-    if (!tenant) return [] as Array<{ label: string; value: React.ReactNode }>;
-
-    const labelMap: Record<string, string> = {
-      tenant_id: 'Tenant ID',
-      tenant_code: 'Tenant Code',
-      company_name: 'Company Name',
-      subscription_plan: 'Subscription Plan',
-      contact_person: 'Contact Person',
-      email: 'Email',
-      status: 'Status',
-      is_active: 'Active',
-      custom_domain: 'Custom Domain',
-      phone_number: 'Phone Number',
-      company_size: 'Company Size',
-      created_at: 'Created At'
-    };
-
-    const rawEntries: Array<{ key: keyof Tenant; value: any }> = [
-      { key: 'tenant_id', value: tenant.tenant_id },
-      { key: 'tenant_code', value: tenant.tenant_code },
-      { key: 'company_name', value: tenant.company_name },
-      { key: 'subscription_plan', value: tenant.subscription_plan },
-      { key: 'contact_person', value: tenant.contact_person },
-      { key: 'email', value: tenant.email },
-      { key: 'status', value: tenant.status },
-      { key: 'is_active', value: tenant.is_active },
-      { key: 'custom_domain', value: tenant.custom_domain },
-      { key: 'phone_number', value: tenant.phone_number },
-      { key: 'company_size', value: tenant.company_size },
-      { key: 'created_at', value: tenant.created_at }
-    ];
-
-    const formatted = rawEntries
-      .map(({ key, value }) => {
-        let display: React.ReactNode = value as any;
-        if (value === null || value === undefined || value === '') return null;
-        if (key === 'subscription_plan' && typeof value === 'string') {
-          display = value.charAt(0).toUpperCase() + value.slice(1);
-        } else if (key === 'is_active') {
-          display = value ? 'active' : 'inactive';
-        } else if (key === 'created_at' && typeof value === 'string') {
-          const d = new Date(value);
-          display = isNaN(d.getTime()) ? value : d.toLocaleString();
-        }
-
-        return { label: labelMap[key as string] || (key as string), value: display };
-      })
-      .filter(Boolean) as Array<{ label: string; value: React.ReactNode }>;
-
-    return formatted;
-  };
 
   if (currentUser?.role !== 'super_admin') {
     return (
@@ -386,6 +335,19 @@ export function TenantManagement() {
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  // Show tenant details page if a tenant is selected
+  if (showTenantDetails && selectedTenantId) {
+    return (
+      <TenantDetailsPage 
+        tenantId={selectedTenantId} 
+        onBack={() => {
+          setShowTenantDetails(false);
+          setSelectedTenantId(null);
+        }} 
+      />
     );
   }
 
@@ -785,33 +747,6 @@ export function TenantManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* View-only Tenant Details Dialog */}
-      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Tenant Information{selectedTenant ? ` - ${selectedTenant.company_name}` : ''}</DialogTitle>
-            <DialogDescription>Read-only view of tenant details.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {(() => {
-              const entries = getTenantViewEntries(selectedTenant);
-              return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {entries.map((item, index) => (
-                    <div key={index}>
-                      <Label>{item.label}</Label>
-                      <p className="text-sm mt-1">{item.value}</p>
-              </div>
-                  ))}
-              </div>
-              );
-            })()}
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowViewDialog(false)}>Close</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
