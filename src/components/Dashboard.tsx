@@ -424,12 +424,6 @@ export function Dashboard() {
           </CardContent>
         </Card>
       )}
-
-      {user?.role === 'super_admin' && (
-        <div className="space-y-4">
-          <TenantManagementAdmin />
-        </div>
-      )}
     </div>
   );
 }
