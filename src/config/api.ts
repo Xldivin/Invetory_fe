@@ -21,6 +21,7 @@ export const API_CONFIG = {
   ENDPOINTS: {
     // Auth endpoints
     LOGIN: '/auth/login',
+    REGISTER: '/auth/register',
     LOGIN_PIN: '/auth/login-pin', 
     LOGOUT: '/auth/logout',
     
