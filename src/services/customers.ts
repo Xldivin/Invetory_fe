@@ -143,7 +143,7 @@ export const createCustomer = async (customerData: {
     };
 
     const url = getApiUrl('/customers');
-    const headers = getCommonHeaders(token);
+    const headers = getCommonHeaders(token, getTenantId());
 
     console.log('=== CREATE CUSTOMER API DEBUG ===');
     console.log('Request URL:', url);

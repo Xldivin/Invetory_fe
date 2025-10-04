@@ -106,7 +106,7 @@ export function UserManagement() {
   const [loading, setLoading] = useState(false);
   
   // Tenants state
-  const [tenants, setTenants] = useState<Array<{id: string, name: string}>>([]);
+  const [tenants, setTenants] = useState<Array<{id: string, tenant_id: string, name: string}>>([]);
   
   // Role management state
   const [roles, setRoles] = useState<Role[]>([]);
@@ -324,6 +324,7 @@ export function UserManagement() {
         // Transform API response to match expected format
         const transformedTenants = data.data.map((tenant: any) => ({
           id: tenant.tenant_id.toString(),
+          tenant_id: tenant.tenant_id.toString(),
           name: tenant.company_name
         }));
         console.log('Transformed tenants:', transformedTenants);
@@ -372,13 +373,19 @@ export function UserManagement() {
         const transformedUsers: User[] = data.data.map((apiUser: ApiUser) => {
           // Find tenant information if tenant_id exists
           // Convert both IDs to strings for comparison since API might return numbers
-          const tenant = apiUser.tenant_id ? tenants.find(t => t.id === String(apiUser.tenant_id)) : null;
+          const tenant = apiUser.tenant_id ? tenants.find(t => 
+            String(t.tenant_id) === String(apiUser.tenant_id)
+          ) : null;
           
           console.log('User transformation debug:', {
             userId: apiUser.user_id,
             tenantId: apiUser.tenant_id,
             tenantIdType: typeof apiUser.tenant_id,
-            availableTenants: tenants.map(t => ({ id: t.id, name: t.name, idType: typeof t.id })),
+            availableTenants: tenants.map(t => ({ 
+              tenant_id: t.tenant_id,
+              name: t.name, 
+              tenantIdType: typeof t.tenant_id
+            })),
             foundTenant: tenant
           });
           
@@ -418,7 +425,7 @@ export function UserManagement() {
         getApiUrl(API_CONFIG.ENDPOINTS.PERMISSIONS_CATALOG),
         {
           method: 'GET',
-          headers: getCommonHeaders(token)
+          headers: getCommonHeaders(token, getTenantId())
         }
       );
 
@@ -533,12 +540,13 @@ export function UserManagement() {
     
     try {
       const token = getAuthToken();
+      const tenantId = getTenantId();
       console.log('Fetching permissions for user ID:', userId); // Debug log
       const response = await fetch(
         getApiUrl(`${API_CONFIG.ENDPOINTS.USERS}/${userId}/permissions?all=true`),
         {
           method: 'GET',
-          headers: getCommonHeaders(token)
+          headers: getCommonHeaders(token, tenantId)
         }
       );
 
@@ -569,12 +577,13 @@ export function UserManagement() {
     try {
       setLoading(true);
       const token = getAuthToken();
+      const tenantId = getTenantId();
       console.log('Updating permissions for user ID:', userId, 'Permissions:', permissions); // Debug log
       const response = await fetch(
         getApiUrl(`${API_CONFIG.ENDPOINTS.USERS}/${userId}/permissions?all=true`),
         {
           method: 'POST',
-          headers: getCommonHeaders(token),
+          headers: getCommonHeaders(token, tenantId),
           body: JSON.stringify({ permissions })
         }
       );
@@ -603,8 +612,9 @@ export function UserManagement() {
     try {
       setLoading(true);
       const token = getAuthToken();
+      const tenantId = getTenantId();
       const url = getApiUrl('/roles');
-      const headers = getCommonHeaders(token);
+      const headers = getCommonHeaders(token, tenantId);
       
       console.log('=== FETCH ROLES DEBUG ===');
       console.log('URL:', url);
@@ -646,8 +656,9 @@ export function UserManagement() {
     try {
       setLoading(true);
       const token = getAuthToken();
+      const tenantId = getTenantId();
       const url = getApiUrl('/roles');
-      const headers = getCommonHeaders(token);
+      const headers = getCommonHeaders(token, tenantId);
       const body = JSON.stringify(roleForm);
       
       console.log('=== ADD ROLE DEBUG ===');
@@ -696,8 +707,9 @@ export function UserManagement() {
     try {
       setLoading(true);
       const token = getAuthToken();
+      const tenantId = getTenantId();
       const url = getApiUrl(`/roles/${selectedRole.role_id}`);
-      const headers = getCommonHeaders(token);
+      const headers = getCommonHeaders(token, tenantId);
       const body = JSON.stringify(roleForm);
       
       console.log('=== EDIT ROLE DEBUG ===');
@@ -752,8 +764,9 @@ export function UserManagement() {
     try {
       setLoading(true);
       const token = getAuthToken();
+      const tenantId = getTenantId();
       const url = getApiUrl(`/roles/${role.role_id}`);
-      const headers = getCommonHeaders(token);
+      const headers = getCommonHeaders(token, tenantId);
       
       console.log('=== DELETE ROLE DEBUG ===');
       console.log('Role to delete:', role);
@@ -829,8 +842,9 @@ export function UserManagement() {
     try {
       setLoading(true);
       const token = getAuthToken();
+      const tenantId = getTenantId();
       const url = getApiUrl(`/roles/${roleId}/permissions`);
-      const headers = getCommonHeaders(token);
+      const headers = getCommonHeaders(token, tenantId);
       const body = JSON.stringify({ permissions });
       
       console.log('=== UPDATE ROLE PERMISSIONS DEBUG ===');

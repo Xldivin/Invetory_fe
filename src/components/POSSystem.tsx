@@ -156,6 +156,13 @@ export function POSSystem() {
     );
     if (!product) return;
     
+    // Ensure we have a valid price
+    const unitPrice = parseFloat(String(product.cost_price || product.price || product.retail_price || 0));
+    if (isNaN(unitPrice) || unitPrice < 0) {
+      console.error('Invalid price for product:', product);
+      return;
+    }
+    
     // Debug logging for price information
     console.log('Adding product to cart:', {
       productId,
@@ -163,7 +170,7 @@ export function POSSystem() {
       costPrice: product.cost_price,
       price: product.price,
       retailPrice: product.retail_price,
-      finalPrice: product.cost_price || product.price || product.retail_price || 0
+      finalPrice: unitPrice
     });
 
     const existingItem = cartItems.find(item => item.productId === productId);
@@ -180,9 +187,9 @@ export function POSSystem() {
         productId: product.id || String(product.product_id),
         productName: product.name || product.product_name,
         quantity: 1,
-        unitPrice: product.cost_price || product.price || product.retail_price || 0,
+        unitPrice: unitPrice,
         discount: 0,
-        total: product.cost_price || product.price || product.retail_price || 0
+        total: unitPrice
       };
       setCartItems(prev => [...prev, newItem]);
     }
@@ -194,11 +201,14 @@ export function POSSystem() {
       return;
     }
     
-    setCartItems(prev => prev.map(item =>
-      item.id === itemId
-        ? { ...item, quantity, total: quantity * item.unitPrice }
-        : item
-    ));
+    setCartItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        const unitPrice = parseFloat(String(item.unitPrice)) || 0;
+        const total = quantity * unitPrice;
+        return { ...item, quantity, total: isNaN(total) ? 0 : total };
+      }
+      return item;
+    }));
   };
 
   const removeFromCart = (itemId: string) => {
@@ -209,11 +219,14 @@ export function POSSystem() {
     setCartItems([]);
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.total, 0);
+  const subtotal = cartItems.reduce((sum, item) => {
+    const itemTotal = parseFloat(String(item.total)) || 0;
+    return sum + (isNaN(itemTotal) ? 0 : itemTotal);
+  }, 0);
   const discountAmount = (subtotal * discount) / 100;
   const taxRate = 8.25; // Default tax rate
   const taxAmount = ((subtotal - discountAmount) * taxRate) / 100;
-  const total = subtotal - discountAmount + taxAmount;
+  const total = isNaN(subtotal - discountAmount + taxAmount) ? 0 : subtotal - discountAmount + taxAmount;
 
   // Debug logging for totals
   console.log('Cart totals calculation:', {
@@ -222,11 +235,14 @@ export function POSSystem() {
     discountAmount,
     taxAmount,
     total,
+    isSubtotalNaN: isNaN(subtotal),
+    isTotalNaN: isNaN(total),
     cartItemsDetails: cartItems.map(item => ({
       productName: item.productName,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
-      total: item.total
+      total: item.total,
+      isItemTotalNaN: isNaN(parseFloat(String(item.total)))
     }))
   });
 
