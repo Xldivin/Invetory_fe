@@ -143,10 +143,12 @@ export interface Invoice {
   taxAmount: number;
   discountAmount: number;
   total: number;
-  paymentMethod: 'cash' | 'card' | 'digital' | 'credit';
+  paymentMethod: 'cash' | 'card' | 'digital' | 'credit' | 'mobile' | 'bank';
   status: 'draft' | 'paid' | 'cancelled' | 'refunded';
   createdBy: string;
   createdAt: Date;
+  transactionId?: string;
+  paymentData?: any;
 }
 
 export interface InvoiceItem {

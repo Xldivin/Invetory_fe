@@ -45,6 +45,12 @@ export const API_CONFIG = {
     // Tenants endpoints
     TENANTS: '/tenants',
     PERMISSIONS_CATALOG: '/permissions-catalog',
+    
+    // Customer endpoints
+    CUSTOMERS: '/customers',
+    
+    // Order endpoints
+    ORDERS: '/orders',
   }
 };
 

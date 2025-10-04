@@ -23,25 +23,54 @@ import {
 } from 'lucide-react';
 import { useInventory } from '../contexts/InventoryContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Customer, InvoiceItem } from '../types';
+import { InvoiceItem } from '../types';
 import { getApiUrl, getCommonHeaders, getAuthToken, getTenantId, API_CONFIG } from '../config/api';
+import { getCustomers, createCustomer, Customer as ApiCustomer } from '../services/customers';
+import { CheckoutModal } from './CheckoutModal';
+import { toast } from 'sonner';
 
 export function POSSystem() {
-  const { products, customers, addCustomer, addInvoice } = useInventory();
+  const { products, addInvoice } = useInventory();
   const { user, logActivity } = useAuth();
+
+  // Validate user has required fields for their role
+  const validateUserRole = () => {
+    if (!user) {
+      return { isValid: false, error: 'User not authenticated' };
+    }
+
+    if (user.role === 'shop_manager' && !user.shop_id) {
+      return { isValid: false, error: 'Shop ID is required for shop manager but not found in user profile' };
+    }
+
+    if (user.role === 'warehouse_manager' && !user.warehouse_id) {
+      return { isValid: false, error: 'Warehouse ID is required for warehouse manager but not found in user profile' };
+    }
+
+    if (user.role !== 'shop_manager' && user.role !== 'warehouse_manager' && !user.shop_id && !user.warehouse_id) {
+      return { isValid: false, error: 'Either shop_id or warehouse_id is required for order creation' };
+    }
+
+    return { isValid: true, error: null };
+  };
   
   // API products state
   const [apiProducts, setApiProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  
+  // API customers state
+  const [apiCustomers, setApiCustomers] = useState<ApiCustomer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [cartItems, setCartItems] = useState<InvoiceItem[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<ApiCustomer | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'digital' | 'credit'>('cash');
   const [discount, setDiscount] = useState(0);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   
   const [newCustomer, setNewCustomer] = useState({
     name: '',
@@ -49,6 +78,27 @@ export function POSSystem() {
     phone: '',
     address: ''
   });
+
+  // Load customers from API
+  const loadCustomers = async () => {
+    setCustomersLoading(true);
+    setError(null);
+    try {
+      const customersData = await getCustomers();
+      setApiCustomers(customersData);
+      console.log('Loaded customers:', customersData);
+    } catch (err) {
+      console.error('Error loading customers:', err);
+      setError('Failed to load customers');
+    } finally {
+      setCustomersLoading(false);
+    }
+  };
+
+  // Load customers on component mount
+  useEffect(() => {
+    loadCustomers();
+  }, []);
 
   // Fetch products from API
   useEffect(() => {
@@ -105,6 +155,16 @@ export function POSSystem() {
       (p.product_id && String(p.product_id) === productId)
     );
     if (!product) return;
+    
+    // Debug logging for price information
+    console.log('Adding product to cart:', {
+      productId,
+      productName: product.name || product.product_name,
+      costPrice: product.cost_price,
+      price: product.price,
+      retailPrice: product.retail_price,
+      finalPrice: product.cost_price || product.price || product.retail_price || 0
+    });
 
     const existingItem = cartItems.find(item => item.productId === productId);
     
@@ -120,9 +180,9 @@ export function POSSystem() {
         productId: product.id || String(product.product_id),
         productName: product.name || product.product_name,
         quantity: 1,
-        unitPrice: product.price || product.retail_price || 0,
+        unitPrice: product.cost_price || product.price || product.retail_price || 0,
         discount: 0,
-        total: product.price || product.retail_price || 0
+        total: product.cost_price || product.price || product.retail_price || 0
       };
       setCartItems(prev => [...prev, newItem]);
     }
@@ -155,51 +215,117 @@ export function POSSystem() {
   const taxAmount = ((subtotal - discountAmount) * taxRate) / 100;
   const total = subtotal - discountAmount + taxAmount;
 
-  const handleAddCustomer = () => {
-    if (!newCustomer.name.trim()) return;
+  // Debug logging for totals
+  console.log('Cart totals calculation:', {
+    cartItems: cartItems.length,
+    subtotal,
+    discountAmount,
+    taxAmount,
+    total,
+    cartItemsDetails: cartItems.map(item => ({
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      total: item.total
+    }))
+  });
+
+  const handleAddCustomer = async () => {
+    if (!newCustomer.name.trim() || !newCustomer.email.trim()) {
+      setError('Name and email are required');
+      return;
+    }
     
-    addCustomer({
-      name: newCustomer.name,
-      email: newCustomer.email || undefined,
-      phone: newCustomer.phone || undefined,
-      address: newCustomer.address || undefined
-    });
+    setCustomersLoading(true);
+    setError(null);
     
-    setNewCustomer({ name: '', email: '', phone: '', address: '' });
-    setShowNewCustomer(false);
+    try {
+      const createdCustomer = await createCustomer({
+        full_name: newCustomer.name,
+        email: newCustomer.email,
+        phone_number: newCustomer.phone || ''
+      });
+      
+      console.log('Customer created successfully:', createdCustomer);
+      
+      if (createdCustomer) {
+        // Add to local state
+        setApiCustomers(prev => [...prev, createdCustomer]);
+      }
+      
+      // Reset form and close dialog
+      setNewCustomer({ name: '', email: '', phone: '', address: '' });
+      setShowNewCustomer(false);
+      
+      // Refresh the customers list to ensure we have the latest data
+      loadCustomers();
+    } catch (err) {
+      console.error('Error creating customer:', err);
+      setError('Failed to create customer');
+    } finally {
+      setCustomersLoading(false);
+    }
   };
 
   const handleCheckout = () => {
-    if (cartItems.length === 0) return;
-    
+    if (cartItems.length === 0) {
+      toast.error('Cart is empty');
+      return;
+    }
+
+    // Validate user role before proceeding
+    const validation = validateUserRole();
+    if (!validation.isValid) {
+      toast.error(validation.error);
+      console.error('User role validation failed:', validation.error);
+      return;
+    }
+
+    setShowCheckoutModal(true);
+  };
+
+  const handleCompleteSale = (paymentData: any) => {
+    // Process the sale with payment data
     addInvoice({
-      customerId: selectedCustomer?.id,
+      customerId: selectedCustomer?.user_id?.toString(),
       shopId: '1', // Current shop
       items: cartItems,
       subtotal,
       taxAmount,
       discountAmount,
       total,
-      paymentMethod,
+      paymentMethod: paymentData.method,
       status: 'paid',
-      createdBy: user?.id || ''
+      createdBy: user?.id || '',
+      ...(paymentData.transactionId && { transactionId: paymentData.transactionId }),
+      ...(paymentData && { paymentData: paymentData })
     });
 
     logActivity('sale_completed', 'pos', {
       total,
       itemCount: cartItems.length,
-      customer: selectedCustomer?.name || 'Walk-in'
+      customer: selectedCustomer?.full_name || 'Walk-in',
+      paymentMethod: paymentData.method,
+      transactionId: paymentData.transactionId,
+      orderId: paymentData.orderId,
+      orderNumber: paymentData.orderNumber
     });
+
+    // Show success message with order details
+    if (paymentData.orderNumber) {
+      toast.success(`Sale completed! Order #${paymentData.orderNumber} created.`);
+    }
 
     // Clear cart and reset
     clearCart();
     setSelectedCustomer(null);
     setDiscount(0);
-    setShowCheckout(false);
+    setShowCheckoutModal(false);
   };
 
   return (
     <div className="h-full p-6">
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
         {/* Products Section */}
         <div className="lg:col-span-2 space-y-4">
@@ -264,7 +390,7 @@ export function POSSystem() {
                   const productId = product.id || String(product.product_id);
                   const productName = product.name || product.product_name;
                   const productSku = product.sku || product.product_sku || 'No SKU';
-                  const productPrice = product.price || product.retail_price || 0;
+                  const productPrice = product.cost_price || product.price || product.retail_price || 0;
                   
                   return (
                     <Card 
@@ -316,16 +442,16 @@ export function POSSystem() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Select onValueChange={(value: string) => {
-                const customer = customers.find(c => c.id === value);
+                const customer = apiCustomers.find(c => c.user_id.toString() === value);
                 setSelectedCustomer(customer || null);
               }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select customer" />
+                  <SelectValue placeholder={customersLoading ? "Loading customers..." : "Select customer"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
+                  {apiCustomers.map((customer) => (
+                    <SelectItem key={customer.user_id} value={customer.user_id.toString()}>
+                      {customer.full_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -343,23 +469,31 @@ export function POSSystem() {
                     <DialogTitle>Add New Customer</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
+                    {error && (
+                      <div className="text-sm text-destructive bg-destructive/10 p-2 rounded">
+                        {error}
+                      </div>
+                    )}
+                    
                     <div>
-                      <Label htmlFor="customerName">Name</Label>
+                      <Label htmlFor="customerName">Name *</Label>
                       <Input
                         id="customerName"
                         value={newCustomer.name}
                         onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="Customer name"
+                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="customerEmail">Email</Label>
+                      <Label htmlFor="customerEmail">Email *</Label>
                       <Input
                         id="customerEmail"
                         type="email"
                         value={newCustomer.email}
                         onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
                         placeholder="email@example.com"
+                        required
                       />
                     </div>
                     <div>
@@ -371,17 +505,12 @@ export function POSSystem() {
                         placeholder="+1-555-0123"
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="customerAddress">Address</Label>
-                      <Input
-                        id="customerAddress"
-                        value={newCustomer.address}
-                        onChange={(e) => setNewCustomer(prev => ({ ...prev, address: e.target.value }))}
-                        placeholder="123 Main St, City, State"
-                      />
-                    </div>
-                    <Button onClick={handleAddCustomer} className="w-full">
-                      Add Customer
+                    <Button 
+                      onClick={handleAddCustomer} 
+                      className="w-full" 
+                      disabled={customersLoading}
+                    >
+                      {customersLoading ? 'Creating...' : 'Add Customer'}
                     </Button>
                   </div>
                 </DialogContent>
@@ -450,7 +579,7 @@ export function POSSystem() {
           </Card>
 
           {/* Totals and Checkout */}
-          {cartItems.length > 0 && (
+          {cartItems.length > 0 ? (
             <Card>
               <CardContent className="p-4 space-y-3">
                 <div className="space-y-2">
@@ -458,71 +587,16 @@ export function POSSystem() {
                     <span>Subtotal:</span>
                     <span>{subtotal.toLocaleString()} RWF</span>
                   </div>
-                  {discount > 0 && (
-                    <div className="flex justify-between text-sm text-red-600">
-                      <span>Discount ({discount}%):</span>
-                      <span>-{discountAmount.toLocaleString()} RWF</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-sm">
                     <span>Tax ({taxRate}%):</span>
                     <span>{taxAmount.toLocaleString()} RWF</span>
                   </div>
-                  <div className="flex justify-between border-t pt-2">
+                  <div className="flex justify-between border-t pt-2 font-semibold">
                     <span>Total:</span>
-                    <span>{total.toLocaleString()} RWF</span>
+                    <span className="text-lg">{total.toLocaleString()} RWF</span>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Discount %</Label>
-                  <Input
-                    type="number"
-                    value={discount}
-                    onChange={(e) => setDiscount(Math.max(0, Math.min(100, Number(e.target.value))))}
-                    placeholder="0"
-                    min="0"
-                    max="100"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Payment Method</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant={paymentMethod === 'cash' ? 'default' : 'outline'}
-                      onClick={() => setPaymentMethod('cash')}
-                      className="h-12"
-                    >
-                      <Banknote className="w-4 h-4 mr-2" />
-                      Cash
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'card' ? 'default' : 'outline'}
-                      onClick={() => setPaymentMethod('card')}
-                      className="h-12"
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Card
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'digital' ? 'default' : 'outline'}
-                      onClick={() => setPaymentMethod('digital')}
-                      className="h-12"
-                    >
-                      <Smartphone className="w-4 h-4 mr-2" />
-                      Digital
-                    </Button>
-                    <Button
-                      variant={paymentMethod === 'credit' ? 'default' : 'outline'}
-                      onClick={() => setPaymentMethod('credit')}
-                      className="h-12"
-                    >
-                      <Calculator className="w-4 h-4 mr-2" />
-                      Credit
-                    </Button>
-                  </div>
-                </div>
 
                 <Button
                   onClick={handleCheckout}
@@ -534,9 +608,29 @@ export function POSSystem() {
                 </Button>
               </CardContent>
             </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-4 text-center text-muted-foreground">
+                <Receipt className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Add items to cart to see totals</p>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
+
+      {/* Checkout Modal */}
+      <CheckoutModal
+        isOpen={showCheckoutModal}
+        onClose={() => setShowCheckoutModal(false)}
+        cartItems={cartItems}
+        selectedCustomer={selectedCustomer}
+        subtotal={subtotal}
+        taxAmount={taxAmount}
+        discountAmount={discountAmount}
+        total={total}
+        onCompleteSale={handleCompleteSale}
+      />
     </div>
   );
 }
